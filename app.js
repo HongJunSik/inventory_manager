@@ -23,6 +23,10 @@ const INITIAL_ORDERS = [
 let items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
 let orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
 
+// 관리자 비밀번호
+const ADMIN_PASSWORD = "5977";
+let passwordCallback = null; // 인증 성공 시 호출할 함수 임시 저장
+
 // 현재 활성화된 필터 조건 상태
 let currentInventoryFloor = "all";
 let currentInventoryCategory = "all";
@@ -105,7 +109,15 @@ const elements = {
   restockItemCurrent: document.getElementById("restock-item-current"),
   restockQtyInput: document.getElementById("restock-qty-input"),
   restockCloseBtn: document.getElementById("restock-close-btn"),
-  restockCancelBtn: document.getElementById("restock-cancel-btn")
+  restockCancelBtn: document.getElementById("restock-cancel-btn"),
+
+  // 비밀번호 모달
+  passwordModal: document.getElementById("password-modal"),
+  passwordForm: document.getElementById("password-form"),
+  passwordInput: document.getElementById("password-input"),
+  passwordError: document.getElementById("password-error"),
+  passwordCloseBtn: document.getElementById("password-close-btn"),
+  passwordCancelBtn: document.getElementById("password-cancel-btn")
 };
 
 // --------------------------------------------------
@@ -159,7 +171,54 @@ elements.themeToggleBtn.addEventListener("click", () => {
 });
 
 // --------------------------------------------------
-// 5. 대시보드 렌더링 로직
+// 5. 보안 비밀번호 인증 모달 제어
+// --------------------------------------------------
+
+function runWithPasswordProtection(callback) {
+  passwordCallback = callback;
+  elements.passwordInput.value = "";
+  elements.passwordError.classList.add("d-none");
+  elements.passwordModal.classList.add("active");
+  setTimeout(() => elements.passwordInput.focus(), 150);
+}
+
+function closePasswordModal() {
+  elements.passwordModal.classList.remove("active");
+  passwordCallback = null;
+}
+
+elements.passwordCloseBtn.addEventListener("click", closePasswordModal);
+elements.passwordCancelBtn.addEventListener("click", closePasswordModal);
+
+elements.passwordForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const inputVal = elements.passwordInput.value;
+
+  if (inputVal === ADMIN_PASSWORD) {
+    const callback = passwordCallback; // 콜백 함수를 임시 변수에 백업
+    closePasswordModal(); // 모달 닫기 및 passwordCallback = null 처리
+    if (typeof callback === "function") {
+      callback(); // 백업해 둔 콜백 실행
+    }
+  } else {
+    // 비밀번호 불일치 시 흔들림 애니메이션 효과 및 메시지 노출
+    elements.passwordError.classList.remove("d-none");
+    const modalContent = elements.passwordModal.querySelector(".modal-card");
+    modalContent.classList.add("shake");
+    
+    // 흔들림 완료 후 클래스 제거 (재실행 가능하게)
+    setTimeout(() => {
+      modalContent.classList.remove("shake");
+    }, 400);
+
+    elements.passwordInput.value = "";
+    elements.passwordInput.focus();
+  }
+});
+
+
+// --------------------------------------------------
+// 6. 대시보드 렌더링 로직
 // --------------------------------------------------
 function renderDashboard() {
   // 1) 요약 통계 계산
@@ -238,7 +297,7 @@ function renderDashboard() {
 }
 
 // --------------------------------------------------
-// 6. 재고 목록 렌더링 및 CRUD 로직
+// 7. 재고 목록 렌더링 및 CRUD 로직
 // --------------------------------------------------
 function renderInventoryTable() {
   elements.inventoryTbody.innerHTML = "";
@@ -327,22 +386,24 @@ elements.categoryFilter.addEventListener("change", () => {
 });
 elements.inventorySearch.addEventListener("input", renderInventoryTable);
 
-// 물품 삭제 함수
+// 물품 삭제 함수 (비밀번호 인증 필요)
 window.deleteItem = function(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
 
-  if (confirm(`[${item.name}] 물품을 삭제하시겠습니까? 관련 발주 내역의 이름은 유지되나 목록에서 완전 삭제됩니다.`)) {
-    items = items.filter(i => i.id !== id);
-    saveData();
-    updateOrderSelect(); // 발주 셀렉트박스 목록도 함께 업데이트
-    renderInventoryTable();
-    renderDashboard();
-  }
+  runWithPasswordProtection(() => {
+    if (confirm(`[${item.name}] 물품을 정말로 삭제하시겠습니까?`)) {
+      items = items.filter(i => i.id !== id);
+      saveData();
+      updateOrderSelect(); // 발주 셀렉트박스 목록도 함께 업데이트
+      renderInventoryTable();
+      renderDashboard();
+    }
+  });
 };
 
 // --------------------------------------------------
-// 7. 발주 기록 및 입고 신청 관리 로직
+// 8. 발주 기록 및 입고 신청 관리 로직
 // --------------------------------------------------
 
 // 발주 신청 셀렉트박스 옵션 목록 갱신
@@ -358,7 +419,7 @@ function updateOrderSelect() {
   });
 }
 
-// 발주 이력 렌더링
+// 발주 이력 렌더링 (삭제 버튼 추가)
 function renderOrderHistory() {
   elements.orderHistoryTbody.innerHTML = "";
 
@@ -385,11 +446,11 @@ function renderOrderHistory() {
         ? `<span class="badge bg-success-soft"><i data-lucide="check-circle-2" style="width:12px;height:12px"></i>입고완료</span>`
         : `<span class="badge bg-warning-soft"><i data-lucide="clock" style="width:12px;height:12px"></i>발주중</span>`;
 
-      // 발주 상태가 '발주중'인 경우 입고 처리 완료 버튼 제공
-      const actionButton = isCompleted
-        ? `<span class="text-success font-semibold" style="font-size: 13px;">입고완료 처리됨</span>`
-        : `<button class="btn btn-success btn-sm" onclick="completeOrder('${order.id}')">
-            <i data-lucide="download"></i> 입고 완료 처리
+      // 발주 상태가 '발주중'인 경우 입고 완료 버튼 제공, 입고완료인 경우 '완료' 표시
+      const actionContent = isCompleted
+        ? `<span class="text-success font-semibold mr-2" style="font-size: 13px;">입고 완료</span>`
+        : `<button class="btn btn-success btn-sm mr-2" onclick="completeOrder('${order.id}')">
+            <i data-lucide="download"></i> 입고완료
            </button>`;
 
       const tr = document.createElement("tr");
@@ -400,7 +461,14 @@ function renderOrderHistory() {
         <td>${order.applicant}</td>
         <td>${statusBadge}</td>
         <td class="text-muted">${order.notes || "-"}</td>
-        <td class="text-center">${actionButton}</td>
+        <td>
+          <div class="text-center" style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+            ${actionContent}
+            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${order.id}')" title="발주 기록 삭제">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </td>
       `;
       elements.orderHistoryTbody.appendChild(tr);
     });
@@ -449,7 +517,7 @@ elements.orderForm.addEventListener("submit", (e) => {
   alert(`[${item.name}] 발주 신청이 완료되었습니다.`);
 });
 
-// 발주 상태 '입고완료' 처리 및 연동 재고 증가
+// 발주 상태 '입고완료' 처리 및 연동 재고 증가 (비밀번호 인증 필요)
 window.completeOrder = function(orderId) {
   const order = orders.find(o => o.id === orderId);
   if (!order) return;
@@ -457,31 +525,50 @@ window.completeOrder = function(orderId) {
   const targetItem = items.find(i => i.id === order.itemId);
 
   if (targetItem) {
-    if (confirm(`발주 신청 수량(${order.quantity}개)을 [${targetItem.name}] 재고에 추가(입고) 처리하시겠습니까?`)) {
-      // 1) 재고 증가
-      targetItem.quantity += order.quantity;
-      // 2) 발주 상태 변경
-      order.status = "입고완료";
-      
-      saveData();
-      
-      // 3) 화면 갱신
-      renderDashboard();
-      renderInventoryTable();
-      renderOrderHistory();
-      updateOrderSelect();
-      
-      alert(`[${targetItem.name}] 물품이 ${order.quantity}개 정상 입고되어 재고가 업데이트되었습니다.`);
-    }
+    runWithPasswordProtection(() => {
+      if (confirm(`발주 신청 수량(${order.quantity}개)을 [${targetItem.name}] 재고에 추가(입고) 처리하시겠습니까?`)) {
+        // 1) 재고 증가
+        targetItem.quantity += order.quantity;
+        // 2) 발주 상태 변경
+        order.status = "입고완료";
+        
+        saveData();
+        
+        // 3) 화면 갱신
+        renderDashboard();
+        renderInventoryTable();
+        renderOrderHistory();
+        updateOrderSelect();
+        
+        alert(`[${targetItem.name}] 물품이 ${order.quantity}개 정상 입고되어 재고가 업데이트되었습니다.`);
+      }
+    });
   } else {
-    // 혹시 품목이 삭제된 경우에 대한 예외 처리
-    if (confirm("원본 재고 물품이 삭제되었습니다. 발주 이력 상태만 입고완료로 처리하겠습니까?")) {
-      order.status = "입고완료";
-      saveData();
-      renderDashboard();
-      renderOrderHistory();
-    }
+    // 원본 재고 물품이 삭제된 경우
+    runWithPasswordProtection(() => {
+      if (confirm("원본 재고 물품이 삭제되었습니다. 발주 이력 상태만 입고완료로 처리하겠습니까?")) {
+        order.status = "입고완료";
+        saveData();
+        renderDashboard();
+        renderOrderHistory();
+      }
+    });
   }
+};
+
+// 발주 기록 삭제 함수 (비밀번호 인증 필요)
+window.deleteOrder = function(orderId) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  runWithPasswordProtection(() => {
+    if (confirm(`[${order.itemName}]의 발주 및 입고 기록을 삭제하시겠습니까? (이 작업은 되돌릴 수 없으며, 이미 반영된 재고 수량은 수동으로 조정해야 합니다.)`)) {
+      orders = orders.filter(o => o.id !== orderId);
+      saveData();
+      renderOrderHistory();
+      renderDashboard();
+    }
+  });
 };
 
 // 발주 이력 필터링 탭 이벤트 바인딩
@@ -495,7 +582,7 @@ elements.orderTabBtns.forEach(btn => {
 });
 
 // --------------------------------------------------
-// 8. 신규 등록 및 수정 모달 (Item Modal) 기능
+// 9. 신규 등록 및 수정 모달 (Item Modal) 기능
 // --------------------------------------------------
 
 function openAddItemModal() {
@@ -543,6 +630,19 @@ elements.itemForm.addEventListener("submit", (e) => {
   const quantity = parseInt(elements.itemQuantity.value, 10);
   const safetyStock = parseInt(elements.itemSafetyStock.value, 10);
   const notes = elements.itemNotes.value.trim();
+
+  // 중복 검사: 대소문자 및 모든 공백을 무시하고 동일한 이름이 이미 있는지 확인
+  const cleanName = name.replace(/\s+/g, "").toLowerCase();
+  const isDuplicate = items.some(item => {
+    const existingCleanName = item.name.replace(/\s+/g, "").toLowerCase();
+    return existingCleanName === cleanName && item.id !== editId;
+  });
+
+  if (isDuplicate) {
+    alert("이미 등록된 물품입니다.");
+    elements.itemName.focus();
+    return;
+  }
 
   if (editId) {
     // 1) 기존 품목 수정
@@ -592,7 +692,7 @@ elements.itemForm.addEventListener("submit", (e) => {
 
 
 // --------------------------------------------------
-// 9. 빠른 입고 모달 (Restock Modal) 기능
+// 10. 빠른 입고 모달 (Restock Modal) 기능
 // --------------------------------------------------
 
 window.openRestockModal = function(id) {
@@ -641,7 +741,7 @@ elements.restockForm.addEventListener("submit", (e) => {
 
 
 // --------------------------------------------------
-// 10. 초기 앱 구동 시 초기화
+// 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
 function initApp() {
   renderDashboard();

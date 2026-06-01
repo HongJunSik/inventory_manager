@@ -279,7 +279,7 @@
                       <th>신청자</th>
                       <th>상태</th>
                       <th>비고</th>
-                      <th class="text-center">조치</th>
+                      <th class="text-center" style="width: 220px;">조치</th>
                     </tr>
                   </thead>
                   <tbody id="order-history-tbody">
@@ -308,8 +308,8 @@
         </button>
       </div>
       <form id="item-form">
-        <input type="hidden" id="edit-item-id">
         <div class="modal-body">
+          <input type="hidden" id="edit-item-id">
           <div class="form-group">
             <label for="item-name">품목명 <span class="text-danger">*</span></label>
             <input type="text" id="item-name" class="form-control" placeholder="예: A4 용지, 믹스커피" required>
@@ -378,6 +378,30 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="restock-cancel-btn">취소</button>
           <button type="submit" class="btn btn-success">입고 완료</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 비밀번호 확인 모달 -->
+  <div id="password-modal" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h2>보안 비밀번호 입력</h2>
+        <button class="modal-close" id="password-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="password-form">
+        <div class="modal-body text-center">
+          <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">이 작업을 실행하려면 관리자 비밀번호 4자리를 입력하세요.</p>
+          <input type="password" id="password-input" class="form-control text-center" 
+                 maxlength="4" placeholder="••••" style="font-size: 24px; letter-spacing: 8px; width: 140px; margin: 0 auto;" required>
+          <p class="text-danger mt-2 d-none" id="password-error" style="font-size: 12px; font-weight: 600;">비밀번호가 일치하지 않습니다.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="password-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-primary">확인</button>
         </div>
       </form>
     </div>

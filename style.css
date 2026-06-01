@@ -988,3 +988,22 @@ body.light-theme .form-control {
   font-weight: 700;
   margin-left: 6px;
 }
+
+/* --------------------------------------------------
+   12. 보안 애니메이션 (Shake) 및 유틸리티
+-------------------------------------------------- */
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.mb-3 { margin-bottom: 12px !important; }
+.mb-2 { margin-bottom: 8px !important; }
+.mr-2 { margin-right: 8px !important; }
+.gap-2 { gap: 8px !important; }
+
