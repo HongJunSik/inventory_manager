@@ -25,19 +25,24 @@ const INITIAL_ORDERS = [
 const SUPABASE_URL = "https://zvkcgccxmjcmvufkinmd.supabase.co";       // 예: "https://your-project.supabase.co"
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2a2NnY2N4bWpjbXZ1Zmtpbm1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODc3NDksImV4cCI6MjA5NTk2Mzc0OX0.MvR8g6cAmQy7vI0IZ9IQkf2LE65AESWEPduWp5gQMEc";  // 예: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-let supabase = null;
+let supabaseClient = null;
 
 function initSupabase() {
   if (SUPABASE_URL && SUPABASE_ANON_KEY) {
     try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log("Supabase 클라이언트가 초기화되었습니다.");
+      if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase 클라이언트가 초기화되었습니다.");
+      } else {
+        console.error("Supabase CDN이 로드되지 않았습니다.");
+        supabaseClient = null;
+      }
     } catch (e) {
       console.error("Supabase 초기화 실패:", e);
-      supabase = null;
+      supabaseClient = null;
     }
   } else {
-    supabase = null;
+    supabaseClient = null;
   }
 }
 initSupabase();
@@ -48,12 +53,12 @@ let orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORD
 
 // Supabase로부터 최신 데이터를 비동기로 동기화하는 함수
 async function syncWithSupabase() {
-  if (!supabase) return false;
+  if (!supabaseClient) return false;
   try {
-    const { data: dbItems, error: itemsError } = await supabase.from("items").select("*");
+    const { data: dbItems, error: itemsError } = await supabaseClient.from("items").select("*");
     if (itemsError) throw itemsError;
 
-    const { data: dbOrders, error: ordersError } = await supabase.from("orders").select("*");
+    const { data: dbOrders, error: ordersError } = await supabaseClient.from("orders").select("*");
     if (ordersError) throw ordersError;
 
     items = dbItems || [];
@@ -470,8 +475,8 @@ window.deleteItem = function(id) {
 
   runWithPasswordProtection(async () => {
     if (confirm(`[${item.name}] 물품을 정말로 삭제하시겠습니까?`)) {
-      if (supabase) {
-        const { error } = await supabase.from("items").delete().eq("id", id);
+      if (supabaseClient) {
+        const { error } = await supabaseClient.from("items").delete().eq("id", id);
         if (error) {
           alert(`Supabase 삭제 실패: ${error.message}`);
           return;
@@ -587,8 +592,8 @@ elements.orderForm.addEventListener("submit", async (e) => {
     notes: notes
   };
 
-  if (supabase) {
-    const { error } = await supabase.from("orders").insert(newOrder);
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from("orders").insert(newOrder);
     if (error) {
       alert(`Supabase 발주 신청 실패: ${error.message}`);
       return;
@@ -620,9 +625,9 @@ window.completeOrder = function(orderId) {
     runWithPasswordProtection(async () => {
       if (confirm(`발주 신청 수량(${order.quantity}개)을 [${targetItem.name}] 재고에 추가(입고) 처리하시겠습니까?`)) {
         const nextQty = targetItem.quantity + order.quantity;
-        if (supabase) {
-          const { error: itemErr } = await supabase.from("items").update({ quantity: nextQty }).eq("id", targetItem.id);
-          const { error: orderErr } = await supabase.from("orders").update({ status: "입고완료" }).eq("id", orderId);
+        if (supabaseClient) {
+          const { error: itemErr } = await supabaseClient.from("items").update({ quantity: nextQty }).eq("id", targetItem.id);
+          const { error: orderErr } = await supabaseClient.from("orders").update({ status: "입고완료" }).eq("id", orderId);
           if (itemErr || orderErr) {
             alert(`Supabase 업데이트 실패: ${itemErr?.message || orderErr?.message}`);
             return;
@@ -649,8 +654,8 @@ window.completeOrder = function(orderId) {
     // 원본 재고 물품이 삭제된 경우
     runWithPasswordProtection(async () => {
       if (confirm("원본 재고 물품이 삭제되었습니다. 발주 이력 상태만 입고완료로 처리하겠습니까?")) {
-        if (supabase) {
-          const { error } = await supabase.from("orders").update({ status: "입고완료" }).eq("id", orderId);
+        if (supabaseClient) {
+          const { error } = await supabaseClient.from("orders").update({ status: "입고완료" }).eq("id", orderId);
           if (error) {
             alert(`Supabase 업데이트 실패: ${error.message}`);
             return;
@@ -672,8 +677,8 @@ window.deleteOrder = function(orderId) {
 
   runWithPasswordProtection(async () => {
     if (confirm(`[${order.itemName}]의 발주 및 입고 기록을 삭제하시겠습니까? (이 작업은 되돌릴 수 없으며, 이미 반영된 재고 수량은 수동으로 조정해야 합니다.)`)) {
-      if (supabase) {
-        const { error } = await supabase.from("orders").delete().eq("id", orderId);
+      if (supabaseClient) {
+        const { error } = await supabaseClient.from("orders").delete().eq("id", orderId);
         if (error) {
           alert(`Supabase 삭제 실패: ${error.message}`);
           return;
@@ -771,15 +776,15 @@ elements.itemForm.addEventListener("submit", async (e) => {
     notes
   };
 
-  if (supabase) {
-    const { error: itemErr } = await supabase.from("items").upsert(itemPayload);
+  if (supabaseClient) {
+    const { error: itemErr } = await supabaseClient.from("items").upsert(itemPayload);
     if (itemErr) {
       alert(`Supabase 저장 실패: ${itemErr.message}`);
       return;
     }
 
     if (editId) {
-      const { error: orderErr } = await supabase
+      const { error: orderErr } = await supabaseClient
         .from("orders")
         .update({ itemName: name })
         .eq("itemId", editId)
@@ -855,8 +860,8 @@ elements.restockForm.addEventListener("submit", async (e) => {
   const item = items.find(i => i.id === id);
   if (item && restockQty > 0) {
     const nextQty = item.quantity + restockQty;
-    if (supabase) {
-      const { error } = await supabase.from("items").update({ quantity: nextQty }).eq("id", id);
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from("items").update({ quantity: nextQty }).eq("id", id);
       if (error) {
         alert(`Supabase 입고 업데이트 실패: ${error.message}`);
         return;
@@ -881,7 +886,7 @@ elements.restockForm.addEventListener("submit", async (e) => {
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
 async function initApp() {
-  if (supabase) {
+  if (supabaseClient) {
     await syncWithSupabase();
   }
   renderDashboard();
