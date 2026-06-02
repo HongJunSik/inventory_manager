@@ -8,7 +8,7 @@
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Supabase CDN 추가 -->
+  <!-- Supabase JS Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -46,10 +46,6 @@
           <i data-lucide="smartphone"></i>
           <span class="theme-text">스마트폰 뷰 (390px)</span>
         </button>
-        <button id="supabase-sync-btn" class="theme-toggle" style="margin-top: 8px;">
-          <i data-lucide="database"></i>
-          <span class="theme-text">Supabase 실시간 연동</span>
-        </button>
       </div>
     </aside>
 
@@ -62,10 +58,6 @@
           <p id="page-subtitle" class="text-muted">실시간 사내 재고 현황을 한눈에 파악합니다.</p>
         </div>
         <div class="header-actions">
-          <button id="sync-refresh-btn" class="btn btn-secondary d-none" title="Supabase 실시간 동기화" style="padding: 10px 14px;">
-            <i data-lucide="refresh-cw" id="sync-icon-spin"></i>
-            <span id="sync-status-text">동기화 완료</span>
-          </button>
           <button id="quick-add-btn" class="btn btn-primary">
             <i data-lucide="plus"></i>
             <span>물품 신규 등록</span>
@@ -416,56 +408,6 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="password-cancel-btn">취소</button>
           <button type="submit" class="btn btn-primary">확인</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Supabase 동기화 설정 모달 -->
-  <div id="supabase-modal" class="modal-backdrop">
-    <div class="modal-card" style="max-width: 460px;">
-      <div class="modal-header">
-        <h2>Supabase 실시간 동기화 설정</h2>
-        <button class="modal-close" id="supabase-close-btn">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-      <form id="supabase-form">
-        <div class="modal-body">
-          <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
-            Supabase Project의 API 키 정보와 Realtime 데이터베이스를 활용하여 <strong>0.1초 미만 실시간 동기화</strong>를 구성합니다.
-          </p>
-          <div class="form-group">
-            <label for="supabase-url">Supabase Project URL <span class="text-danger">*</span></label>
-            <input type="url" id="supabase-url" class="form-control" placeholder="https://your-project.supabase.co" required>
-          </div>
-          <div class="form-group">
-            <label for="supabase-anon-key">Supabase Anon Key (API Key) <span class="text-danger">*</span></label>
-            <textarea id="supabase-anon-key" class="form-control" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsIn..." style="font-size: 11px; resize: none;" required></textarea>
-          </div>
-          <div class="form-group mt-3" style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="supabase-sync-enabled" style="width: 16px; height: 16px; cursor: pointer;">
-            <label for="supabase-sync-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none;">실시간 자동 동기화 활성화</label>
-          </div>
-          
-          <div style="background-color: rgba(0, 0, 0, 0.15); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); margin-top: 14px;">
-            <p style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">💡 Supabase 테이블 초기화 SQL</p>
-            <p class="text-muted" style="font-size: 11px; line-height: 1.4; margin-bottom: 8px;">
-              Supabase SQL Editor에 아래 구문을 복사해서 한 번 실행해 주셔야 작동합니다:
-            </p>
-            <textarea readonly class="form-control" style="font-family: monospace; font-size: 10px; height: 100px; resize: none; background-color: rgba(0,0,0,0.25);" onclick="this.select()">create table if not exists public.vibestock_state (
-  id int primary key,
-  data jsonb not null
-);
-insert into public.vibestock_state (id, data) 
-values (1, '{"items": [], "orders": []}')
-on conflict (id) do nothing;
-alter publication supabase_realtime add table public.vibestock_state;</textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" id="supabase-cancel-btn">취소</button>
-          <button type="submit" class="btn btn-primary" id="supabase-submit-btn">설정 저장</button>
         </div>
       </form>
     </div>
