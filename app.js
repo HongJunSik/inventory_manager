@@ -807,7 +807,13 @@ elements.restockForm.addEventListener("submit", (e) => {
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
 async function initApp() {
-  // GitHub 동기화가 켜져 있으면 데이터 원격에서 로딩 시도
+  // 1) 어떤 경우든 로컬 데이터를 기반으로 즉시 화면 최초 렌더링 (화면 먹통 완벽 방지)
+  renderDashboard();
+  renderInventoryTable();
+  renderOrderHistory();
+  updateOrderSelect();
+
+  // 2) Supabase 동기화가 활성화되어 있는 경우에만 백그라운드로 가져오기 시도
   if (supabaseConfig.enabled && supabaseConfig.url && supabaseConfig.anonKey) {
     elements.syncRefreshBtn.classList.remove("d-none");
     updateSyncStatus("연동 활성화", false);
@@ -815,14 +821,10 @@ async function initApp() {
     // Supabase 클라이언트 초기화 및 실시간 수신 바인딩
     initSupabase();
     
-    // 비동기로 최신 데이터를 원격에서 동기화 후 렌더링
+    // 비동기로 최신 데이터를 원격에서 덮어씌움 (실패하더라도 렌더링된 화면은 유지됨)
     await fetchSupabaseData(true); 
   } else {
     elements.syncRefreshBtn.classList.add("d-none");
-    renderDashboard();
-    renderInventoryTable();
-    renderOrderHistory();
-    updateOrderSelect();
   }
 }
 
@@ -918,7 +920,8 @@ async function pushSupabaseData() {
 
 // 2) Supabase에서 최신 데이터 다운로드 (Fetch)
 async function fetchSupabaseData(showLoading = false) {
-  if (!supabaseClient || isSyncing) return;
+  if (!supabaseClient) return;
+  if (isSyncing) return;
   isSyncing = true;
   if (showLoading) {
     updateSyncStatus("불러오는 중...", true);
@@ -932,6 +935,17 @@ async function fetchSupabaseData(showLoading = false) {
       .single();
 
     if (error) {
+      // 테이블은 존재하지만 데이터 행(id=1)이 아예 없는 최초 연동 시, 원격 데이터 초기화 처리
+      if (error.code === 'PGRST116') {
+        console.log("No data row found in Supabase. Inserting initial local data...");
+        const { error: insertErr } = await supabaseClient
+          .from('vibestock_state')
+          .insert([{ id: 1, data: { items, orders } }]);
+        
+        if (insertErr) throw insertErr;
+        updateSyncStatus("실시간 연동 중", false);
+        return;
+      }
       throw error;
     }
 
@@ -941,7 +955,12 @@ async function fetchSupabaseData(showLoading = false) {
     }
   } catch (error) {
     console.error("Supabase Fetch Error:", error);
-    updateSyncStatus("동기화 실패", false);
+    if (error.code === '42P01') {
+      updateSyncStatus("테이블 없음", false);
+      console.warn("vibestock_state 테이블이 Supabase에 존재하지 않습니다. SQL 쿼리를 먼저 실행하세요.");
+    } else {
+      updateSyncStatus("동기화 실패", false);
+    }
   } finally {
     isSyncing = false;
   }
