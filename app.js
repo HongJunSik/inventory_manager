@@ -19,18 +19,52 @@ const INITIAL_ORDERS = [
   { id: "order-3", itemId: "item-3", itemName: "HP A4 용지 (75g)", quantity: 30, applicant: "박민수", date: "2026-06-01", status: "발주중", notes: "반기 보고서 인쇄용" }
 ];
 
-// 로컬 스토리지에서 상태 읽기 또는 초기화
+// --------------------------------------------------
+// 0. Supabase 설정 (여기에 본인의 Supabase 정보를 직접 입력하세요)
+// --------------------------------------------------
+const SUPABASE_URL = "https://zvkcgccxmjcmvufkinmd.supabase.co";       // 예: "https://your-project.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2a2NnY2N4bWpjbXZ1Zmtpbm1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODc3NDksImV4cCI6MjA5NTk2Mzc0OX0.MvR8g6cAmQy7vI0IZ9IQkf2LE65AESWEPduWp5gQMEc";  // 예: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+let supabase = null;
+
+function initSupabase() {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log("Supabase 클라이언트가 초기화되었습니다.");
+    } catch (e) {
+      console.error("Supabase 초기화 실패:", e);
+      supabase = null;
+    }
+  } else {
+    supabase = null;
+  }
+}
+initSupabase();
+
+// 로컬 스토리지에서 상태 읽기 또는 초기화 (Supabase 로딩 전 임시 데이터)
 let items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
 let orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
 
-// Supabase 동기화 설정 상태
-let supabaseConfig = JSON.parse(localStorage.getItem("vibestock_supabase")) || {
-  enabled: false,
-  url: "",
-  anonKey: ""
-};
-let supabaseClient = null;
-let isSyncing = false; // 중복 싱크 방지 플래그
+// Supabase로부터 최신 데이터를 비동기로 동기화하는 함수
+async function syncWithSupabase() {
+  if (!supabase) return false;
+  try {
+    const { data: dbItems, error: itemsError } = await supabase.from("items").select("*");
+    if (itemsError) throw itemsError;
+
+    const { data: dbOrders, error: ordersError } = await supabase.from("orders").select("*");
+    if (ordersError) throw ordersError;
+
+    items = dbItems || [];
+    orders = dbOrders || [];
+    saveData(); // 로컬 스토리지 백업 업데이트
+    return true;
+  } catch (e) {
+    console.error("Supabase 데이터 동기화 실패:", e);
+    return false;
+  }
+}
 
 // 관리자 비밀번호
 const ADMIN_PASSWORD = "5977";
@@ -42,15 +76,11 @@ let currentInventoryCategory = "all";
 let currentOrderFilter = "all";
 
 // --------------------------------------------------
-// 2. LocalStorage 데이터 동기화
+// 2. LocalStorage 데이터 동기화 (로컬 백업용)
 // --------------------------------------------------
 function saveData() {
   localStorage.setItem("vibestock_items", JSON.stringify(items));
   localStorage.setItem("vibestock_orders", JSON.stringify(orders));
-  
-  if (supabaseConfig.enabled && supabaseClient) {
-    pushSupabaseDataDebounced();
-  }
 }
 
 // --------------------------------------------------
@@ -130,20 +160,7 @@ const elements = {
   passwordInput: document.getElementById("password-input"),
   passwordError: document.getElementById("password-error"),
   passwordCloseBtn: document.getElementById("password-close-btn"),
-  passwordCancelBtn: document.getElementById("password-cancel-btn"),
-
-  // Supabase 동기화 관련
-  supabaseSyncBtn: document.getElementById("supabase-sync-btn"),
-  supabaseModal: document.getElementById("supabase-modal"),
-  supabaseForm: document.getElementById("supabase-form"),
-  supabaseUrl: document.getElementById("supabase-url"),
-  supabaseAnonKey: document.getElementById("supabase-anon-key"),
-  supabaseSyncEnabled: document.getElementById("supabase-sync-enabled"),
-  supabaseCloseBtn: document.getElementById("supabase-close-btn"),
-  supabaseCancelBtn: document.getElementById("supabase-cancel-btn"),
-  syncRefreshBtn: document.getElementById("sync-refresh-btn"),
-  syncIconSpin: document.getElementById("sync-icon-spin"),
-  syncStatusText: document.getElementById("sync-status-text")
+  passwordCancelBtn: document.getElementById("password-cancel-btn")
 };
 
 // --------------------------------------------------
@@ -451,8 +468,15 @@ window.deleteItem = function(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
 
-  runWithPasswordProtection(() => {
+  runWithPasswordProtection(async () => {
     if (confirm(`[${item.name}] 물품을 정말로 삭제하시겠습니까?`)) {
+      if (supabase) {
+        const { error } = await supabase.from("items").delete().eq("id", id);
+        if (error) {
+          alert(`Supabase 삭제 실패: ${error.message}`);
+          return;
+        }
+      }
       items = items.filter(i => i.id !== id);
       saveData();
       updateOrderSelect(); // 발주 셀렉트박스 목록도 함께 업데이트
@@ -537,7 +561,7 @@ function renderOrderHistory() {
 }
 
 // 발주 신청 서브밋 핸들러
-elements.orderForm.addEventListener("submit", (e) => {
+elements.orderForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const itemId = elements.orderItemSelect.value;
@@ -563,6 +587,14 @@ elements.orderForm.addEventListener("submit", (e) => {
     notes: notes
   };
 
+  if (supabase) {
+    const { error } = await supabase.from("orders").insert(newOrder);
+    if (error) {
+      alert(`Supabase 발주 신청 실패: ${error.message}`);
+      return;
+    }
+  }
+
   orders.push(newOrder);
   saveData();
 
@@ -585,10 +617,20 @@ window.completeOrder = function(orderId) {
   const targetItem = items.find(i => i.id === order.itemId);
 
   if (targetItem) {
-    runWithPasswordProtection(() => {
+    runWithPasswordProtection(async () => {
       if (confirm(`발주 신청 수량(${order.quantity}개)을 [${targetItem.name}] 재고에 추가(입고) 처리하시겠습니까?`)) {
+        const nextQty = targetItem.quantity + order.quantity;
+        if (supabase) {
+          const { error: itemErr } = await supabase.from("items").update({ quantity: nextQty }).eq("id", targetItem.id);
+          const { error: orderErr } = await supabase.from("orders").update({ status: "입고완료" }).eq("id", orderId);
+          if (itemErr || orderErr) {
+            alert(`Supabase 업데이트 실패: ${itemErr?.message || orderErr?.message}`);
+            return;
+          }
+        }
+
         // 1) 재고 증가
-        targetItem.quantity += order.quantity;
+        targetItem.quantity = nextQty;
         // 2) 발주 상태 변경
         order.status = "입고완료";
         
@@ -605,8 +647,15 @@ window.completeOrder = function(orderId) {
     });
   } else {
     // 원본 재고 물품이 삭제된 경우
-    runWithPasswordProtection(() => {
+    runWithPasswordProtection(async () => {
       if (confirm("원본 재고 물품이 삭제되었습니다. 발주 이력 상태만 입고완료로 처리하겠습니까?")) {
+        if (supabase) {
+          const { error } = await supabase.from("orders").update({ status: "입고완료" }).eq("id", orderId);
+          if (error) {
+            alert(`Supabase 업데이트 실패: ${error.message}`);
+            return;
+          }
+        }
         order.status = "입고완료";
         saveData();
         renderDashboard();
@@ -621,8 +670,15 @@ window.deleteOrder = function(orderId) {
   const order = orders.find(o => o.id === orderId);
   if (!order) return;
 
-  runWithPasswordProtection(() => {
+  runWithPasswordProtection(async () => {
     if (confirm(`[${order.itemName}]의 발주 및 입고 기록을 삭제하시겠습니까? (이 작업은 되돌릴 수 없으며, 이미 반영된 재고 수량은 수동으로 조정해야 합니다.)`)) {
+      if (supabase) {
+        const { error } = await supabase.from("orders").delete().eq("id", orderId);
+        if (error) {
+          alert(`Supabase 삭제 실패: ${error.message}`);
+          return;
+        }
+      }
       orders = orders.filter(o => o.id !== orderId);
       saveData();
       renderOrderHistory();
@@ -680,7 +736,7 @@ elements.modalCloseBtn.addEventListener("click", closeItemModal);
 elements.modalCancelBtn.addEventListener("click", closeItemModal);
 
 // 물품 등록/수정 전송 핸들러
-elements.itemForm.addEventListener("submit", (e) => {
+elements.itemForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const editId = elements.editItemId.value;
@@ -704,19 +760,41 @@ elements.itemForm.addEventListener("submit", (e) => {
     return;
   }
 
+  const targetId = editId || `item-${Date.now()}`;
+  const itemPayload = {
+    id: targetId,
+    name,
+    category,
+    floor,
+    quantity,
+    safetyStock,
+    notes
+  };
+
+  if (supabase) {
+    const { error: itemErr } = await supabase.from("items").upsert(itemPayload);
+    if (itemErr) {
+      alert(`Supabase 저장 실패: ${itemErr.message}`);
+      return;
+    }
+
+    if (editId) {
+      const { error: orderErr } = await supabase
+        .from("orders")
+        .update({ itemName: name })
+        .eq("itemId", editId)
+        .eq("status", "발주중");
+      if (orderErr) {
+        console.warn("발주 내역 품목명 업데이트 실패:", orderErr.message);
+      }
+    }
+  }
+
   if (editId) {
     // 1) 기존 품목 수정
     const itemIndex = items.findIndex(i => i.id === editId);
     if (itemIndex > -1) {
-      items[itemIndex] = {
-        ...items[itemIndex],
-        name,
-        category,
-        floor,
-        quantity,
-        safetyStock,
-        notes
-      };
+      items[itemIndex] = itemPayload;
       
       // 관련된 발주 기록 중 아직 완료되지 않은 발주의 품목명도 일치시켜주어 혼동 예방
       orders.forEach(order => {
@@ -727,17 +805,7 @@ elements.itemForm.addEventListener("submit", (e) => {
     }
   } else {
     // 2) 신규 품목 등록
-    const newId = `item-${Date.now()}`;
-    const newItem = {
-      id: newId,
-      name,
-      category,
-      floor,
-      quantity,
-      safetyStock,
-      notes
-    };
-    items.push(newItem);
+    items.push(itemPayload);
   }
 
   saveData();
@@ -778,7 +846,7 @@ elements.restockCloseBtn.addEventListener("click", closeRestockModal);
 elements.restockCancelBtn.addEventListener("click", closeRestockModal);
 
 // 빠른 입고 폼 전송 핸들러
-elements.restockForm.addEventListener("submit", (e) => {
+elements.restockForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const id = elements.restockItemId.value;
@@ -786,7 +854,16 @@ elements.restockForm.addEventListener("submit", (e) => {
   
   const item = items.find(i => i.id === id);
   if (item && restockQty > 0) {
-    item.quantity += restockQty;
+    const nextQty = item.quantity + restockQty;
+    if (supabase) {
+      const { error } = await supabase.from("items").update({ quantity: nextQty }).eq("id", id);
+      if (error) {
+        alert(`Supabase 입고 업데이트 실패: ${error.message}`);
+        return;
+      }
+    }
+
+    item.quantity = nextQty;
     saveData();
     closeRestockModal();
 
@@ -804,38 +881,13 @@ elements.restockForm.addEventListener("submit", (e) => {
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
 async function initApp() {
-  // Supabase 동기화가 활성화되어 있는 경우 원격 데이터를 우선 로드
-  if (supabaseConfig.enabled && supabaseConfig.url && supabaseConfig.anonKey) {
-    elements.syncRefreshBtn.classList.remove("d-none");
-    updateSyncStatus("연동 활성화", false);
-    
-    // 로딩용 임시 문구 세팅
-    updateSyncStatus("서버 데이터 로딩...", true);
-    
-    // Supabase 클라이언트 초기화 및 실시간 수신 바인딩
-    initSupabase();
-    
-    // 서버 데이터를 완벽히 Fetch한 후 화면을 렌더링 (먹통 방지를 위해 실패 시에만 로컬 데모 구동)
-    const success = await fetchSupabaseData(true); 
-    if (!success) {
-      console.warn("Supabase 연결 실패로 로컬 백업본 데이터를 로드합니다.");
-      items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
-      orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
-      renderDashboard();
-      renderInventoryTable();
-      renderOrderHistory();
-      updateOrderSelect();
-    }
-  } else {
-    elements.syncRefreshBtn.classList.add("d-none");
-    // 동기화 비활성화 시 오프라인 로컬 저장소 기반 데모 작동
-    items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
-    orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
-    renderDashboard();
-    renderInventoryTable();
-    renderOrderHistory();
-    updateOrderSelect();
+  if (supabase) {
+    await syncWithSupabase();
   }
+  renderDashboard();
+  renderInventoryTable();
+  renderOrderHistory();
+  updateOrderSelect();
 }
 
 // 앱 실행
@@ -844,250 +896,3 @@ document.addEventListener("DOMContentLoaded", initApp);
 if (document.readyState === "interactive" || document.readyState === "complete") {
   initApp();
 }
-
-// --------------------------------------------------
-// 12. Supabase 실시간 동기화 로직
-// --------------------------------------------------
-
-// 동기화 상태 텍스트 및 스핀 애니메이션 제어
-function updateSyncStatus(text, spin = false) {
-  if (elements.syncStatusText) {
-    elements.syncStatusText.textContent = text;
-  }
-  if (elements.syncIconSpin) {
-    if (spin) {
-      elements.syncIconSpin.classList.add("spin-animation");
-    } else {
-      elements.syncIconSpin.classList.remove("spin-animation");
-    }
-  }
-}
-
-// Supabase 클라이언트 초기화 및 실시간 리스너 작동
-let supabaseChannel = null;
-function initSupabase() {
-  if (!supabaseConfig.url || !supabaseConfig.anonKey) return;
-  
-  try {
-    supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
-    
-    if (supabaseChannel) {
-      supabaseClient.removeChannel(supabaseChannel);
-    }
-    
-    // 실시간(Realtime) 채널 구독 설정
-    supabaseChannel = supabaseClient
-      .channel('public:vibestock_state')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'vibestock_state', filter: 'id=eq.1' },
-        payload => {
-          console.log('Supabase Realtime Update Detected:', payload);
-          if (payload.new && payload.new.data) {
-            handleRealtimeUpdate(payload.new.data);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log("Supabase Connection Status:", status);
-        if (status === "SUBSCRIBED") {
-          updateSyncStatus("실시간 연동 중", false);
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
-          updateSyncStatus("연동 끊김", false);
-        }
-      });
-  } catch (err) {
-    console.error("Supabase Init Error:", err);
-    updateSyncStatus("설정 오류", false);
-  }
-}
-
-// 1) Supabase에 로컬 데이터 업로드 (Push)
-async function pushSupabaseData() {
-  if (!supabaseClient) return;
-  updateSyncStatus("동기화 중...", true);
-
-  try {
-    const { error } = await supabaseClient
-      .from('vibestock_state')
-      .update({ data: { items, orders } })
-      .eq('id', 1);
-
-    if (error) {
-      throw error;
-    }
-    updateSyncStatus("실시간 연동 중", false);
-  } catch (error) {
-    console.error("Supabase Push Error:", error);
-    updateSyncStatus("동기화 실패", false);
-  }
-}
-
-// 디바운스 전송 헬퍼
-let pushTimeoutId = null;
-function pushSupabaseDataDebounced() {
-  if (!supabaseClient) return;
-  
-  updateSyncStatus("대기 중...", false);
-  
-  if (pushTimeoutId) {
-    clearTimeout(pushTimeoutId);
-  }
-  
-  pushTimeoutId = setTimeout(async () => {
-    await pushSupabaseData();
-  }, 300);
-}
-
-// 2) Supabase에서 최신 데이터 다운로드 (Fetch)
-async function fetchSupabaseData(showLoading = false) {
-  if (!supabaseClient) return false;
-  if (isSyncing) return false;
-  isSyncing = true;
-  if (showLoading) {
-    updateSyncStatus("불러오는 중...", true);
-  }
-
-  try {
-    const { data, error } = await supabaseClient
-      .from('vibestock_state')
-      .select('data')
-      .eq('id', 1)
-      .single();
-
-    if (error) {
-      // 테이블은 존재하지만 데이터 행(id=1)이 아예 없는 최초 연동 시, 원격 데이터 초기화 처리
-      if (error.code === 'PGRST116') {
-        console.log("No data row found in Supabase. Initializing from current local storage...");
-        // 깃허브 Pages 최초 연동 시, 로컬에 저장되어 있던 재고를 최초 1회 마이그레이션 백업
-        const localItems = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
-        const localOrders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
-        
-        const { error: insertErr } = await supabaseClient
-          .from('vibestock_state')
-          .insert([{ id: 1, data: { items: localItems, orders: localOrders } }]);
-        
-        if (insertErr) throw insertErr;
-        
-        items = localItems;
-        orders = localOrders;
-        renderDashboard();
-        renderInventoryTable();
-        renderOrderHistory();
-        updateOrderSelect();
-        
-        updateSyncStatus("실시간 연동 중", false);
-        return true;
-      }
-      throw error;
-    }
-
-    if (data && data.data) {
-      // 서버 데이터를 오직 하나의 원천(Single Source of Truth)으로 삼아 덮어쓰고 렌더링
-      items = data.data.items || [];
-      orders = data.data.orders || [];
-      
-      renderDashboard();
-      renderInventoryTable();
-      renderOrderHistory();
-      updateOrderSelect();
-      
-      updateSyncStatus("실시간 연동 중", false);
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error("Supabase Fetch Error:", error);
-    if (error.code === '42P01') {
-      updateSyncStatus("테이블 없음", false);
-      console.warn("vibestock_state 테이블이 Supabase에 존재하지 않습니다. SQL 쿼리를 먼저 실행하세요.");
-    } else {
-      updateSyncStatus("동기화 실패", false);
-    }
-    return false;
-  } finally {
-    isSyncing = false;
-  }
-}
-
-// 3) 실시간 수신 데이터의 로컬 덮어쓰기 처리 (병합 로직 전면 제거)
-function handleRealtimeUpdate(newData) {
-  const serverItems = newData.items || [];
-  const serverOrders = newData.orders || [];
-  
-  const localItemsStr = JSON.stringify(items);
-  const serverItemsStr = JSON.stringify(serverItems);
-  const localOrdersStr = JSON.stringify(orders);
-  const serverOrdersStr = JSON.stringify(serverOrders);
-  
-  // 데이터가 실제로 다를 때만 덮어쓰고 재렌더링
-  if (localItemsStr !== serverItemsStr || localOrdersStr !== serverOrdersStr) {
-    items = serverItems;
-    orders = serverOrders;
-    
-    renderDashboard();
-    renderInventoryTable();
-    renderOrderHistory();
-    updateOrderSelect();
-  }
-}
-
-// 4) 모달 제어 및 서브밋 이벤트 핸들러
-function openSupabaseModal() {
-  elements.supabaseUrl.value = supabaseConfig.url || "";
-  elements.supabaseAnonKey.value = supabaseConfig.anonKey || "";
-  elements.supabaseSyncEnabled.checked = supabaseConfig.enabled;
-  elements.supabaseModal.classList.add("active");
-}
-
-function closeSupabaseModal() {
-  elements.supabaseModal.classList.remove("active");
-}
-
-// UI 바인딩
-elements.supabaseSyncBtn.addEventListener("click", openSupabaseModal);
-elements.supabaseCloseBtn.addEventListener("click", closeSupabaseModal);
-elements.supabaseCancelBtn.addEventListener("click", closeSupabaseModal);
-
-// 수동 새로고침 클릭
-elements.syncRefreshBtn.addEventListener("click", async () => {
-  await fetchSupabaseData(true);
-});
-
-elements.supabaseForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  
-  const url = elements.supabaseUrl.value.trim();
-  const anonKey = elements.supabaseAnonKey.value.trim();
-  const enabled = elements.supabaseSyncEnabled.checked;
-
-  supabaseConfig = { url, anonKey, enabled };
-  localStorage.setItem("vibestock_supabase", JSON.stringify(supabaseConfig));
-  
-  closeSupabaseModal();
-
-  if (enabled) {
-    elements.syncRefreshBtn.classList.remove("d-none");
-    updateSyncStatus("연동 시도 중...", true);
-    
-    // Supabase 클라이언트 초기화 및 실시간 수신 바인딩
-    initSupabase();
-    
-    // 데이터를 우선 한 번 가져와 동기화
-    await fetchSupabaseData(true);
-    // 현재 데이터를 서버에 업로드하여 정합성 맞춤
-    await pushSupabaseData();
-    
-    alert("Supabase 0.1초 실시간 자동 동기화가 활성화되었습니다.");
-  } else {
-    // 실시간 구독 해제
-    if (supabaseClient && supabaseChannel) {
-      supabaseClient.removeChannel(supabaseChannel);
-      supabaseChannel = null;
-    }
-    supabaseClient = null;
-    elements.syncRefreshBtn.classList.add("d-none");
-    alert("자동 동기화가 비활성화되었습니다.");
-  }
-});
-
