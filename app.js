@@ -49,7 +49,7 @@ function saveData() {
   localStorage.setItem("vibestock_orders", JSON.stringify(orders));
   
   if (supabaseConfig.enabled && supabaseClient) {
-    pushSupabaseData();
+    pushSupabaseDataDebounced();
   }
 }
 
@@ -803,28 +803,38 @@ elements.restockForm.addEventListener("submit", (e) => {
 // --------------------------------------------------
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
-// --------------------------------------------------
-// 11. 초기 앱 구동 시 초기화
-// --------------------------------------------------
 async function initApp() {
-  // 1) 어떤 경우든 로컬 데이터를 기반으로 즉시 화면 최초 렌더링 (화면 먹통 완벽 방지)
-  renderDashboard();
-  renderInventoryTable();
-  renderOrderHistory();
-  updateOrderSelect();
-
-  // 2) Supabase 동기화가 활성화되어 있는 경우에만 백그라운드로 가져오기 시도
+  // Supabase 동기화가 활성화되어 있는 경우 원격 데이터를 우선 로드
   if (supabaseConfig.enabled && supabaseConfig.url && supabaseConfig.anonKey) {
     elements.syncRefreshBtn.classList.remove("d-none");
     updateSyncStatus("연동 활성화", false);
     
+    // 로딩용 임시 문구 세팅
+    updateSyncStatus("서버 데이터 로딩...", true);
+    
     // Supabase 클라이언트 초기화 및 실시간 수신 바인딩
     initSupabase();
     
-    // 비동기로 최신 데이터를 원격에서 덮어씌움 (실패하더라도 렌더링된 화면은 유지됨)
-    await fetchSupabaseData(true); 
+    // 서버 데이터를 완벽히 Fetch한 후 화면을 렌더링 (먹통 방지를 위해 실패 시에만 로컬 데모 구동)
+    const success = await fetchSupabaseData(true); 
+    if (!success) {
+      console.warn("Supabase 연결 실패로 로컬 백업본 데이터를 로드합니다.");
+      items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
+      orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
+      renderDashboard();
+      renderInventoryTable();
+      renderOrderHistory();
+      updateOrderSelect();
+    }
   } else {
     elements.syncRefreshBtn.classList.add("d-none");
+    // 동기화 비활성화 시 오프라인 로컬 저장소 기반 데모 작동
+    items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
+    orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
+    renderDashboard();
+    renderInventoryTable();
+    renderOrderHistory();
+    updateOrderSelect();
   }
 }
 
@@ -859,10 +869,8 @@ function initSupabase() {
   if (!supabaseConfig.url || !supabaseConfig.anonKey) return;
   
   try {
-    // 글로벌 supabase 객체를 활용해 클라이언트 초기화
     supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
     
-    // 기존 구독 채널이 있다면 명시적으로 연결 해제
     if (supabaseChannel) {
       supabaseClient.removeChannel(supabaseChannel);
     }
@@ -896,8 +904,7 @@ function initSupabase() {
 
 // 1) Supabase에 로컬 데이터 업로드 (Push)
 async function pushSupabaseData() {
-  if (!supabaseClient || isSyncing) return;
-  isSyncing = true;
+  if (!supabaseClient) return;
   updateSyncStatus("동기화 중...", true);
 
   try {
@@ -913,15 +920,29 @@ async function pushSupabaseData() {
   } catch (error) {
     console.error("Supabase Push Error:", error);
     updateSyncStatus("동기화 실패", false);
-  } finally {
-    isSyncing = false;
   }
+}
+
+// 디바운스 전송 헬퍼
+let pushTimeoutId = null;
+function pushSupabaseDataDebounced() {
+  if (!supabaseClient) return;
+  
+  updateSyncStatus("대기 중...", false);
+  
+  if (pushTimeoutId) {
+    clearTimeout(pushTimeoutId);
+  }
+  
+  pushTimeoutId = setTimeout(async () => {
+    await pushSupabaseData();
+  }, 300);
 }
 
 // 2) Supabase에서 최신 데이터 다운로드 (Fetch)
 async function fetchSupabaseData(showLoading = false) {
-  if (!supabaseClient) return;
-  if (isSyncing) return;
+  if (!supabaseClient) return false;
+  if (isSyncing) return false;
   isSyncing = true;
   if (showLoading) {
     updateSyncStatus("불러오는 중...", true);
@@ -937,22 +958,44 @@ async function fetchSupabaseData(showLoading = false) {
     if (error) {
       // 테이블은 존재하지만 데이터 행(id=1)이 아예 없는 최초 연동 시, 원격 데이터 초기화 처리
       if (error.code === 'PGRST116') {
-        console.log("No data row found in Supabase. Inserting initial local data...");
+        console.log("No data row found in Supabase. Initializing from current local storage...");
+        // 깃허브 Pages 최초 연동 시, 로컬에 저장되어 있던 재고를 최초 1회 마이그레이션 백업
+        const localItems = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
+        const localOrders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
+        
         const { error: insertErr } = await supabaseClient
           .from('vibestock_state')
-          .insert([{ id: 1, data: { items, orders } }]);
+          .insert([{ id: 1, data: { items: localItems, orders: localOrders } }]);
         
         if (insertErr) throw insertErr;
+        
+        items = localItems;
+        orders = localOrders;
+        renderDashboard();
+        renderInventoryTable();
+        renderOrderHistory();
+        updateOrderSelect();
+        
         updateSyncStatus("실시간 연동 중", false);
-        return;
+        return true;
       }
       throw error;
     }
 
     if (data && data.data) {
-      handleRealtimeUpdate(data.data);
+      // 서버 데이터를 오직 하나의 원천(Single Source of Truth)으로 삼아 덮어쓰고 렌더링
+      items = data.data.items || [];
+      orders = data.data.orders || [];
+      
+      renderDashboard();
+      renderInventoryTable();
+      renderOrderHistory();
+      updateOrderSelect();
+      
       updateSyncStatus("실시간 연동 중", false);
+      return true;
     }
+    return false;
   } catch (error) {
     console.error("Supabase Fetch Error:", error);
     if (error.code === '42P01') {
@@ -961,12 +1004,13 @@ async function fetchSupabaseData(showLoading = false) {
     } else {
       updateSyncStatus("동기화 실패", false);
     }
+    return false;
   } finally {
     isSyncing = false;
   }
 }
 
-// 3) 실시간 수신 데이터의 로컬 병합 처리
+// 3) 실시간 수신 데이터의 로컬 덮어쓰기 처리 (병합 로직 전면 제거)
 function handleRealtimeUpdate(newData) {
   const serverItems = newData.items || [];
   const serverOrders = newData.orders || [];
@@ -980,9 +1024,6 @@ function handleRealtimeUpdate(newData) {
   if (localItemsStr !== serverItemsStr || localOrdersStr !== serverOrdersStr) {
     items = serverItems;
     orders = serverOrders;
-    
-    localStorage.setItem("vibestock_items", JSON.stringify(items));
-    localStorage.setItem("vibestock_orders", JSON.stringify(orders));
     
     renderDashboard();
     renderInventoryTable();
@@ -1032,7 +1073,7 @@ elements.supabaseForm.addEventListener("submit", async (e) => {
     // Supabase 클라이언트 초기화 및 실시간 수신 바인딩
     initSupabase();
     
-    // 데이터를 우선 한 번 가져오고
+    // 데이터를 우선 한 번 가져와 동기화
     await fetchSupabaseData(true);
     // 현재 데이터를 서버에 업로드하여 정합성 맞춤
     await pushSupabaseData();
@@ -1049,3 +1090,4 @@ elements.supabaseForm.addEventListener("submit", async (e) => {
     alert("자동 동기화가 비활성화되었습니다.");
   }
 });
+
