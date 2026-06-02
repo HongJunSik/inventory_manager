@@ -23,6 +23,15 @@ const INITIAL_ORDERS = [
 let items = JSON.parse(localStorage.getItem("vibestock_items")) || INITIAL_ITEMS;
 let orders = JSON.parse(localStorage.getItem("vibestock_orders")) || INITIAL_ORDERS;
 
+// GitHub Gist 동기화 설정 상태
+let githubConfig = JSON.parse(localStorage.getItem("vibestock_github")) || {
+  enabled: false,
+  token: "",
+  gistId: ""
+};
+let syncIntervalId = null;
+let isSyncing = false; // 중복 싱크 방지 플래그
+
 // 관리자 비밀번호
 const ADMIN_PASSWORD = "5977";
 let passwordCallback = null; // 인증 성공 시 호출할 함수 임시 저장
@@ -38,6 +47,10 @@ let currentOrderFilter = "all";
 function saveData() {
   localStorage.setItem("vibestock_items", JSON.stringify(items));
   localStorage.setItem("vibestock_orders", JSON.stringify(orders));
+  
+  if (githubConfig.enabled && githubConfig.token && githubConfig.gistId) {
+    pushGistData();
+  }
 }
 
 // --------------------------------------------------
@@ -117,7 +130,21 @@ const elements = {
   passwordInput: document.getElementById("password-input"),
   passwordError: document.getElementById("password-error"),
   passwordCloseBtn: document.getElementById("password-close-btn"),
-  passwordCancelBtn: document.getElementById("password-cancel-btn")
+  passwordCancelBtn: document.getElementById("password-cancel-btn"),
+
+  // GitHub 동기화 관련
+  githubSyncBtn: document.getElementById("github-sync-btn"),
+  githubModal: document.getElementById("github-modal"),
+  githubForm: document.getElementById("github-form"),
+  githubToken: document.getElementById("github-token"),
+  githubGistId: document.getElementById("github-gist-id"),
+  githubGistCreateBtn: document.getElementById("github-gist-create-btn"),
+  githubSyncEnabled: document.getElementById("github-sync-enabled"),
+  githubCloseBtn: document.getElementById("github-close-btn"),
+  githubCancelBtn: document.getElementById("github-cancel-btn"),
+  syncRefreshBtn: document.getElementById("sync-refresh-btn"),
+  syncIconSpin: document.getElementById("sync-icon-spin"),
+  syncStatusText: document.getElementById("sync-status-text")
 };
 
 // --------------------------------------------------
@@ -777,11 +804,22 @@ elements.restockForm.addEventListener("submit", (e) => {
 // --------------------------------------------------
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
-function initApp() {
-  renderDashboard();
-  renderInventoryTable();
-  renderOrderHistory();
-  updateOrderSelect();
+async function initApp() {
+  // GitHub 동기화가 켜져 있으면 데이터 원격에서 로딩 시도
+  if (githubConfig.enabled && githubConfig.token && githubConfig.gistId) {
+    elements.syncRefreshBtn.classList.remove("d-none");
+    updateSyncStatus("연동 활성화", false);
+    
+    // 비동기로 최신 데이터를 원격에서 동기화 후 렌더링
+    await fetchGistData(true); 
+    startAutoSyncPolling();
+  } else {
+    elements.syncRefreshBtn.classList.add("d-none");
+    renderDashboard();
+    renderInventoryTable();
+    renderOrderHistory();
+    updateOrderSelect();
+  }
 }
 
 // 앱 실행
@@ -790,3 +828,241 @@ document.addEventListener("DOMContentLoaded", initApp);
 if (document.readyState === "interactive" || document.readyState === "complete") {
   initApp();
 }
+
+// --------------------------------------------------
+// 12. GitHub Gist 실시간 동기화 로직
+// --------------------------------------------------
+
+// 동기화 상태 텍스트 및 스핀 애니메이션 제어
+function updateSyncStatus(text, spin = false) {
+  if (elements.syncStatusText) {
+    elements.syncStatusText.textContent = text;
+  }
+  if (elements.syncIconSpin) {
+    if (spin) {
+      elements.syncIconSpin.classList.add("spin-animation");
+    } else {
+      elements.syncIconSpin.classList.remove("spin-animation");
+    }
+  }
+}
+
+// 1) Gist에 로컬 데이터 업로드 (Push)
+async function pushGistData() {
+  if (!githubConfig.token || !githubConfig.gistId || isSyncing) return;
+  isSyncing = true;
+  updateSyncStatus("동기화 중...", true);
+
+  const payload = {
+    description: "VibeStock 스마트 사내 재고 관리 시스템 데이터",
+    files: {
+      "vibestock_data.json": {
+        content: JSON.stringify({ items, orders }, null, 2)
+      }
+    }
+  };
+
+  try {
+    const response = await fetch(`https://api.github.com/gists/${githubConfig.gistId}`, {
+      method: "PATCH",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${githubConfig.token}`,
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+    
+    updateSyncStatus("동기화 완료", false);
+  } catch (error) {
+    console.error("Gist Push Error:", error);
+    updateSyncStatus("동기화 실패", false);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+// 2) Gist에서 최신 데이터 다운로드 (Fetch)
+async function fetchGistData(showLoading = false) {
+  if (!githubConfig.token || !githubConfig.gistId || isSyncing) return;
+  isSyncing = true;
+  if (showLoading) {
+    updateSyncStatus("불러오는 중...", true);
+  }
+
+  try {
+    const response = await fetch(`https://api.github.com/gists/${githubConfig.gistId}`, {
+      method: "GET",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${githubConfig.token}`,
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const fileContent = data.files["vibestock_data.json"]?.content;
+    
+    if (fileContent) {
+      const parsed = JSON.parse(fileContent);
+      
+      const serverItems = parsed.items || [];
+      const serverOrders = parsed.orders || [];
+      
+      // 현재 로컬 데이터와 서버 데이터가 다를 때만 업데이트하여 불필요한 루프/포커스 잃음 방지
+      const localItemsStr = JSON.stringify(items);
+      const serverItemsStr = JSON.stringify(serverItems);
+      const localOrdersStr = JSON.stringify(orders);
+      const serverOrdersStr = JSON.stringify(serverOrders);
+      
+      if (localItemsStr !== serverItemsStr || localOrdersStr !== serverOrdersStr) {
+        items = serverItems;
+        orders = serverOrders;
+        
+        localStorage.setItem("vibestock_items", JSON.stringify(items));
+        localStorage.setItem("vibestock_orders", JSON.stringify(orders));
+        
+        renderDashboard();
+        renderInventoryTable();
+        renderOrderHistory();
+        updateOrderSelect();
+      }
+      
+      updateSyncStatus("동기화 완료", false);
+    }
+  } catch (error) {
+    console.error("Gist Fetch Error:", error);
+    updateSyncStatus("동기화 실패", false);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+// 3) 새로운 Gist 자동 생성 (Create)
+async function createNewGist() {
+  const token = elements.githubToken.value.trim();
+  if (!token) {
+    alert("GitHub 토큰을 먼저 입력해주세요.");
+    elements.githubToken.focus();
+    return;
+  }
+
+  elements.githubGistCreateBtn.textContent = "생성 중...";
+  elements.githubGistCreateBtn.disabled = true;
+
+  const payload = {
+    description: "VibeStock 재고 데이터베이스 (Private Gist)",
+    public: false,
+    files: {
+      "vibestock_data.json": {
+        content: JSON.stringify({ items, orders }, null, 2)
+      }
+    }
+  };
+
+  try {
+    const response = await fetch("https://api.github.com/gists", {
+      method: "POST",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data && data.id) {
+      elements.githubGistId.value = data.id;
+      alert("새로운 GitHub Gist 데이터베이스가 성공적으로 생성 및 할당되었습니다.\n설정 저장을 누르시면 동기화가 활성화됩니다.");
+    }
+  } catch (error) {
+    console.error("Gist Create Error:", error);
+    alert("Gist 생성에 실패했습니다. 토큰의 'gist' 쓰기 권한을 확인해주세요.");
+  } finally {
+    elements.githubGistCreateBtn.textContent = "Gist 생성";
+    elements.githubGistCreateBtn.disabled = false;
+  }
+}
+
+// 4) 자동 폴링 타이머 제어
+function startAutoSyncPolling() {
+  stopAutoSyncPolling();
+  // 15초마다 데이터 동기화
+  syncIntervalId = setInterval(async () => {
+    await fetchGistData(false);
+  }, 15000);
+}
+
+function stopAutoSyncPolling() {
+  if (syncIntervalId) {
+    clearInterval(syncIntervalId);
+    syncIntervalId = null;
+  }
+}
+
+// 5) 모달 제어 및 서브밋 이벤트 핸들러
+function openGithubModal() {
+  elements.githubToken.value = githubConfig.token || "";
+  elements.githubGistId.value = githubConfig.gistId || "";
+  elements.githubSyncEnabled.checked = githubConfig.enabled;
+  elements.githubModal.classList.add("active");
+}
+
+function closeGithubModal() {
+  elements.githubModal.classList.remove("active");
+}
+
+// UI 바인딩
+elements.githubSyncBtn.addEventListener("click", openGithubModal);
+elements.githubCloseBtn.addEventListener("click", closeGithubModal);
+elements.githubCancelBtn.addEventListener("click", closeGithubModal);
+elements.githubGistCreateBtn.addEventListener("click", createNewGist);
+
+// 수동 새로고침 클릭
+elements.syncRefreshBtn.addEventListener("click", async () => {
+  await fetchGistData(true);
+});
+
+elements.githubForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  const token = elements.githubToken.value.trim();
+  const gistId = elements.githubGistId.value.trim();
+  const enabled = elements.githubSyncEnabled.checked;
+
+  if (!gistId) {
+    alert("Gist ID가 있어야 동기화가 가능합니다. 'Gist 생성'을 누르시거나 직접 Gist ID를 입력해주세요.");
+    return;
+  }
+
+  githubConfig = { token, gistId, enabled };
+  localStorage.setItem("vibestock_github", JSON.stringify(githubConfig));
+  
+  closeGithubModal();
+
+  if (enabled) {
+    elements.syncRefreshBtn.classList.remove("d-none");
+    updateSyncStatus("동기화 시도 중...", true);
+    await fetchGistData(true);
+    await pushGistData();
+    startAutoSyncPolling();
+    alert("GitHub Gist 실시간 자동 동기화가 활성화되었습니다.");
+  } else {
+    stopAutoSyncPolling();
+    elements.syncRefreshBtn.classList.add("d-none");
+    alert("자동 동기화가 비활성화되었습니다.");
+  }
+});

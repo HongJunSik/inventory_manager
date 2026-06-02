@@ -1080,6 +1080,10 @@ body.light-theme .form-control {
     gap: 8px;
   }
 
+  .sidebar-footer .theme-toggle {
+    margin-top: 0 !important;
+  }
+
   .theme-toggle {
     padding: 8px;
     width: 36px;
@@ -1363,6 +1367,12 @@ body.simulator-active .sidebar-footer {
   right: 16px;
   margin-top: 0;
   z-index: 1001;
+  display: flex;
+  gap: 8px;
+}
+
+body.simulator-active .sidebar-footer .theme-toggle {
+  margin-top: 0 !important;
 }
 
 body.simulator-active .theme-toggle {
@@ -1556,5 +1566,18 @@ body.simulator-active #password-modal .modal-card {
 
 body.simulator-active .exit-simulator-btn {
   display: flex;
+}
+
+/* --------------------------------------------------
+   14. 동기화 스핀 및 공통 애니메이션
+-------------------------------------------------- */
+.spin-animation {
+  animation: spin 1.5s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 

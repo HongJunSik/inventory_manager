@@ -44,6 +44,10 @@
           <i data-lucide="smartphone"></i>
           <span class="theme-text">스마트폰 뷰 (390px)</span>
         </button>
+        <button id="github-sync-btn" class="theme-toggle" style="margin-top: 8px;">
+          <i data-lucide="github"></i>
+          <span class="theme-text">GitHub 동기화 설정</span>
+        </button>
       </div>
     </aside>
 
@@ -56,6 +60,10 @@
           <p id="page-subtitle" class="text-muted">실시간 사내 재고 현황을 한눈에 파악합니다.</p>
         </div>
         <div class="header-actions">
+          <button id="sync-refresh-btn" class="btn btn-secondary d-none" title="GitHub Gist 실시간 동기화" style="padding: 10px 14px;">
+            <i data-lucide="refresh-cw" id="sync-icon-spin"></i>
+            <span id="sync-status-text">동기화 완료</span>
+          </button>
           <button id="quick-add-btn" class="btn btn-primary">
             <i data-lucide="plus"></i>
             <span>물품 신규 등록</span>
@@ -406,6 +414,45 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="password-cancel-btn">취소</button>
           <button type="submit" class="btn btn-primary">확인</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- GitHub 동기화 설정 모달 -->
+  <div id="github-modal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2>GitHub Gist 동기화 설정</h2>
+        <button class="modal-close" id="github-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="github-form">
+        <div class="modal-body">
+          <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
+            GitHub Pages는 정적 호스팅이므로 기기간 재고 공유를 위해 <strong>GitHub Gist</strong>를 전용 데이터베이스로 활용합니다.
+          </p>
+          <div class="form-group">
+            <label for="github-token">GitHub Personal Access Token (Classic/Fine-grained) <span class="text-danger">*</span></label>
+            <input type="password" id="github-token" class="form-control" placeholder="ghp_로 시작하는 토큰 입력" required>
+            <p class="text-muted mt-1" style="font-size: 11px;">※ 반드시 <strong>gist</strong> 쓰기 권한이 체크된 토큰이어야 합니다.</p>
+          </div>
+          <div class="form-group">
+            <label for="github-gist-id">Gist ID</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="github-gist-id" class="form-control" placeholder="기존 Gist ID 또는 비워두고 자동 생성" style="flex: 1;">
+              <button type="button" id="github-gist-create-btn" class="btn btn-secondary" style="padding: 10px 16px; white-space: nowrap; height: 42px;">Gist 생성</button>
+            </div>
+          </div>
+          <div class="form-group mt-3" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="github-sync-enabled" style="width: 16px; height: 16px; cursor: pointer;">
+            <label for="github-sync-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none;">실시간 자동 동기화 활성화</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="github-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-primary" id="github-submit-btn">설정 저장</button>
         </div>
       </form>
     </div>
