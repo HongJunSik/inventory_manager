@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeStock - 스마트 사내 재고 관리 시스템</title>
+  <!-- Pretendard 한글 폰트 적용 -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN 추가 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <div class="app-container">
+    <!-- 사이드바 네비게이션 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i data-lucide="package-search" class="logo-icon"></i>
+          <span class="logo-text">VibeStock</span>
+        </div>
+      </div>
+      <nav class="sidebar-menu">
+        <button class="nav-item active" data-target="dashboard-section">
+          <i data-lucide="layout-dashboard"></i>
+          <span>대시보드</span>
+        </button>
+        <button class="nav-item" data-target="inventory-section">
+          <i data-lucide="boxes"></i>
+          <span>재고 목록</span>
+        </button>
+        <button class="nav-item" data-target="order-section">
+          <i data-lucide="shopping-cart"></i>
+          <span>발주 및 입고 이력</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="theme-toggle-btn" class="theme-toggle">
+          <i data-lucide="sun" class="sun-icon"></i>
+          <i data-lucide="moon" class="moon-icon"></i>
+          <span class="theme-text">라이트 모드</span>
+        </button>
+        <button id="simulator-toggle-btn" class="theme-toggle" style="margin-top: 8px;">
+          <i data-lucide="smartphone"></i>
+          <span class="theme-text">스마트폰 뷰 (390px)</span>
+        </button>
+        <button id="supabase-sync-btn" class="theme-toggle" style="margin-top: 8px;">
+          <i data-lucide="database"></i>
+          <span class="theme-text">Supabase 실시간 연동</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="main-content">
+      <!-- 헤더 -->
+      <header class="main-header">
+        <div class="header-title">
+          <h1 id="page-title">대시보드</h1>
+          <p id="page-subtitle" class="text-muted">실시간 사내 재고 현황을 한눈에 파악합니다.</p>
+        </div>
+        <div class="header-actions">
+          <button id="sync-refresh-btn" class="btn btn-secondary d-none" title="Supabase 실시간 동기화" style="padding: 10px 14px;">
+            <i data-lucide="refresh-cw" id="sync-icon-spin"></i>
+            <span id="sync-status-text">동기화 완료</span>
+          </button>
+          <button id="quick-add-btn" class="btn btn-primary">
+            <i data-lucide="plus"></i>
+            <span>물품 신규 등록</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 섹션 1: 대시보드 -->
+      <section id="dashboard-section" class="content-section active">
+        <!-- 대시보드 요약 카드 Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon bg-primary-soft">
+              <i data-lucide="box" class="text-primary"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">전체 보유 품목</span>
+              <span class="stat-value" id="stat-total-items">0</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-info-soft">
+              <i data-lucide="map-pin" class="text-info"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">2층 보관 품목</span>
+              <span class="stat-value" id="stat-floor2-items">0</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-purple-soft">
+              <i data-lucide="map-pin" class="text-purple"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">4층 보관 품목</span>
+              <span class="stat-value" id="stat-floor4-items">0</span>
+            </div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-icon bg-danger-soft">
+              <i data-lucide="alert-triangle" class="text-danger"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">안전 재고 부족</span>
+              <span class="stat-value text-danger" id="stat-alert-items">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 실시간 알림 & 퀵 대시보드 레이아웃 -->
+        <div class="dashboard-layout">
+          <!-- 위험 재고 목록 카드 -->
+          <div class="card alert-card-container">
+            <div class="card-header">
+              <div class="card-header-title">
+                <i data-lucide="alert-circle" class="text-danger"></i>
+                <h2>재고 부족 알림</h2>
+              </div>
+              <span class="badge bg-danger-soft text-danger" id="alert-count-badge">0건</span>
+            </div>
+            <div class="card-body">
+              <div class="empty-state" id="alert-empty-state">
+                <i data-lucide="check-circle" class="text-success"></i>
+                <p>모든 품목의 재고가 충분합니다!</p>
+              </div>
+              <ul class="alert-list" id="alert-list-items">
+                <!-- JS에서 동적으로 생성 -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- 최근 발주 기록 요약 카드 -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-title">
+                <i data-lucide="history" class="text-primary"></i>
+                <h2>최근 발주 및 입고 상태</h2>
+              </div>
+              <button class="btn btn-link btn-sm" id="view-all-orders-btn">전체보기</button>
+            </div>
+            <div class="card-body">
+              <div class="empty-state" id="order-empty-state">
+                <i data-lucide="clipboard-list"></i>
+                <p>최근 발주 이력이 없습니다.</p>
+              </div>
+              <div class="table-responsive">
+                <table class="table min-table" id="recent-order-table">
+                  <thead>
+                    <tr>
+                      <th>날짜</th>
+                      <th>품목명</th>
+                      <th>수량</th>
+                      <th>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-order-tbody">
+                    <!-- JS에서 동적 렌더링 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 섹션 2: 재고 목록 -->
+      <section id="inventory-section" class="content-section">
+        <!-- 필터 및 컨트롤 바 -->
+        <div class="control-bar">
+          <!-- 층별 필터 탭 -->
+          <div class="tab-group">
+            <button class="tab-btn active" data-floor="all">전체 위치</button>
+            <button class="tab-btn" data-floor="2F">2층 재고</button>
+            <button class="tab-btn" data-floor="4F">4층 재고</button>
+          </div>
+          <!-- 검색 및 카테고리 필터 -->
+          <div class="search-filter-group">
+            <div class="search-box">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="inventory-search" placeholder="물품명 검색...">
+            </div>
+            <select id="category-filter" class="form-select">
+              <option value="all">전체 카테고리</option>
+              <option value="사무용품">사무용품</option>
+              <option value="식음료/탕비실">식음료/탕비실</option>
+              <option value="생활용품">생활용품</option>
+              <option value="IT기기/장비">IT기기/장비</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 재고 테이블 카드 -->
+        <div class="card mt-4">
+          <div class="table-responsive">
+            <table class="table" id="inventory-table">
+              <thead>
+                <tr>
+                  <th>카테고리</th>
+                  <th>품목명</th>
+                  <th>위치</th>
+                  <th class="text-right">현재 수량</th>
+                  <th class="text-right">안전 재고</th>
+                  <th>상태</th>
+                  <th>비고</th>
+                  <th class="text-center">작업</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-tbody">
+                <!-- JS에서 동적 렌더링 -->
+              </tbody>
+            </table>
+          </div>
+          <!-- 테이블 검색 결과 없음 상태 -->
+          <div class="empty-state d-none" id="table-empty-state">
+            <i data-lucide="folder-open"></i>
+            <p>검색 결과에 맞는 물품이 없습니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 섹션 3: 발주 및 입고 이력 -->
+      <section id="order-section" class="content-section">
+        <div class="order-layout">
+          <!-- 발주 신청 폼 카드 -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-title">
+                <i data-lucide="file-plus" class="text-primary"></i>
+                <h2>신규 발주 신청</h2>
+              </div>
+            </div>
+            <div class="card-body">
+              <form id="order-form" class="vertical-form">
+                <div class="form-group">
+                  <label for="order-item-select">발주 품목 <span class="text-danger">*</span></label>
+                  <select id="order-item-select" class="form-select" required>
+                    <option value="" disabled selected>발주할 품목을 선택하세요</option>
+                    <!-- 품목 목록 동적 로드 -->
+                  </select>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label for="order-quantity">발주 수량 <span class="text-danger">*</span></label>
+                    <input type="number" id="order-quantity" class="form-control" min="1" placeholder="예: 10" required>
+                  </div>
+                  <div class="form-group col">
+                    <label for="order-applicant">신청자 <span class="text-danger">*</span></label>
+                    <input type="text" id="order-applicant" class="form-control" placeholder="홍길동" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="order-notes">발주 비고</label>
+                  <input type="text" id="order-notes" class="form-control" placeholder="예: 빠른 배송 요청, 비품용">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                  <i data-lucide="send"></i>
+                  <span>발주 신청 완료</span>
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- 발주 이력 리스트 카드 -->
+          <div class="card order-history-card">
+            <div class="card-header">
+              <div class="card-header-title">
+                <i data-lucide="clipboard-list" class="text-primary"></i>
+                <h2>전체 발주 및 입고 내역</h2>
+              </div>
+              <div class="tab-group-sm">
+                <button class="tab-btn-sm active" data-order-filter="all">전체</button>
+                <button class="tab-btn-sm" data-order-filter="pending">발주중</button>
+                <button class="tab-btn-sm" data-order-filter="completed">입고완료</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table" id="order-history-table">
+                  <thead>
+                    <tr>
+                      <th>신청일</th>
+                      <th>품목명</th>
+                      <th class="text-right">수량</th>
+                      <th>신청자</th>
+                      <th>상태</th>
+                      <th>비고</th>
+                      <th class="text-center" style="width: 220px;">조치</th>
+                    </tr>
+                  </thead>
+                  <tbody id="order-history-tbody">
+                    <!-- JS에서 동적 렌더링 -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state d-none" id="order-history-empty-state">
+                <i data-lucide="clipboard"></i>
+                <p>발주 이력이 없습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 물품 등록 / 수정 모달 -->
+  <div id="item-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">물품 신규 등록</h2>
+        <button class="modal-close" id="modal-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="item-form">
+        <div class="modal-body">
+          <input type="hidden" id="edit-item-id">
+          <div class="form-group">
+            <label for="item-name">품목명 <span class="text-danger">*</span></label>
+            <input type="text" id="item-name" class="form-control" placeholder="예: A4 용지, 믹스커피" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group col">
+              <label for="item-category">카테고리 <span class="text-danger">*</span></label>
+              <select id="item-category" class="form-select" required>
+                <option value="사무용품">사무용품</option>
+                <option value="식음료/탕비실">식음료/탕비실</option>
+                <option value="생활용품">생활용품</option>
+                <option value="IT기기/장비">IT기기/장비</option>
+                <option value="기타">기타</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label for="item-floor">보관 위치 <span class="text-danger">*</span></label>
+              <select id="item-floor" class="form-select" required>
+                <option value="2F">2층 (탕비실/사무소)</option>
+                <option value="4F">4층 (비품실/기계실)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col">
+              <label for="item-quantity">현재 수량 <span class="text-danger">*</span></label>
+              <input type="number" id="item-quantity" class="form-control" min="0" placeholder="0" required>
+            </div>
+            <div class="form-group col">
+              <label for="item-safety-stock">안전 재고 기준 <span class="text-danger">*</span></label>
+              <input type="number" id="item-safety-stock" class="form-control" min="0" placeholder="기준 수량 미만 시 경고" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="item-notes">비고</label>
+            <input type="text" id="item-notes" class="form-control" placeholder="규격, 브랜드, 색상 등 설명 기재">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="modal-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit-btn">등록</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 퀵 입고 모달 -->
+  <div id="restock-modal" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h2>물품 빠른 입고</h2>
+        <button class="modal-close" id="restock-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="restock-form">
+        <input type="hidden" id="restock-item-id">
+        <div class="modal-body">
+          <p class="restock-item-display">품목명: <strong id="restock-item-name">-</strong></p>
+          <p class="restock-item-display">현재 수량: <span id="restock-item-current">-</span></p>
+          <div class="form-group mt-3">
+            <label for="restock-qty-input">추가 입고 수량 <span class="text-danger">*</span></label>
+            <input type="number" id="restock-qty-input" class="form-control" min="1" placeholder="더할 수량을 입력하세요" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="restock-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-success">입고 완료</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 비밀번호 확인 모달 -->
+  <div id="password-modal" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h2>보안 비밀번호 입력</h2>
+        <button class="modal-close" id="password-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="password-form">
+        <div class="modal-body text-center">
+          <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">이 작업을 실행하려면 관리자 비밀번호 4자리를 입력하세요.</p>
+          <input type="password" id="password-input" class="form-control text-center" 
+                 maxlength="4" placeholder="••••" style="font-size: 24px; letter-spacing: 8px; width: 140px; margin: 0 auto;" required>
+          <p class="text-danger mt-2 d-none" id="password-error" style="font-size: 12px; font-weight: 600;">비밀번호가 일치하지 않습니다.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="password-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-primary">확인</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase 동기화 설정 모달 -->
+  <div id="supabase-modal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <h2>Supabase 실시간 동기화 설정</h2>
+        <button class="modal-close" id="supabase-close-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="supabase-form">
+        <div class="modal-body">
+          <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
+            Supabase Project의 API 키 정보와 Realtime 데이터베이스를 활용하여 <strong>0.1초 미만 실시간 동기화</strong>를 구성합니다.
+          </p>
+          <div class="form-group">
+            <label for="supabase-url">Supabase Project URL <span class="text-danger">*</span></label>
+            <input type="url" id="supabase-url" class="form-control" placeholder="https://your-project.supabase.co" required>
+          </div>
+          <div class="form-group">
+            <label for="supabase-anon-key">Supabase Anon Key (API Key) <span class="text-danger">*</span></label>
+            <textarea id="supabase-anon-key" class="form-control" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsIn..." style="font-size: 11px; resize: none;" required></textarea>
+          </div>
+          <div class="form-group mt-3" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="supabase-sync-enabled" style="width: 16px; height: 16px; cursor: pointer;">
+            <label for="supabase-sync-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none;">실시간 자동 동기화 활성화</label>
+          </div>
+          
+          <div style="background-color: rgba(0, 0, 0, 0.15); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); margin-top: 14px;">
+            <p style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">💡 Supabase 테이블 초기화 SQL</p>
+            <p class="text-muted" style="font-size: 11px; line-height: 1.4; margin-bottom: 8px;">
+              Supabase SQL Editor에 아래 구문을 복사해서 한 번 실행해 주셔야 작동합니다:
+            </p>
+            <textarea readonly class="form-control" style="font-family: monospace; font-size: 10px; height: 100px; resize: none; background-color: rgba(0,0,0,0.25);" onclick="this.select()">create table if not exists public.vibestock_state (
+  id int primary key,
+  data jsonb not null
+);
+insert into public.vibestock_state (id, data) 
+values (1, '{"items": [], "orders": []}')
+on conflict (id) do nothing;
+alter publication supabase_realtime add table public.vibestock_state;</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="supabase-cancel-btn">취소</button>
+          <button type="submit" class="btn btn-primary" id="supabase-submit-btn">설정 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 모바일 시뮬레이터 해제용 플로팅 버튼 -->
+  <button id="exit-simulator-btn" class="exit-simulator-btn">
+    <i data-lucide="monitor"></i>
+    <span>데스크탑 뷰로 돌아가기</span>
+  </button>
+
+  <script src="app.js"></script>
+</body>
+</html>
