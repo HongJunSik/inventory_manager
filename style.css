@@ -1568,16 +1568,3 @@ body.simulator-active .exit-simulator-btn {
   display: flex;
 }
 
-/* --------------------------------------------------
-   14. 동기화 스핀 및 공통 애니메이션
--------------------------------------------------- */
-.spin-animation {
-  animation: spin 1.5s linear infinite;
-  display: inline-block;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
