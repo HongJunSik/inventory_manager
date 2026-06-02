@@ -1007,3 +1007,554 @@ body.light-theme .form-control {
 .mr-2 { margin-right: 8px !important; }
 .gap-2 { gap: 8px !important; }
 
+/* --------------------------------------------------
+   13. 모바일 반응형 및 스마트폰 시뮬레이터 스타일
+-------------------------------------------------- */
+
+/* 모바일 뷰 스타일 (실제 모바일 768px 이하 또는 시뮬레이터 활성화 시 공통 적용) */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    top: auto;
+    width: 100%;
+    height: 64px;
+    padding: 0 8px;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-sidebar);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+  }
+
+  .sidebar-header {
+    display: none;
+  }
+
+  .sidebar-menu {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-around;
+    gap: 4px;
+  }
+
+  .nav-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 10px;
+    border-radius: var(--border-radius-sm);
+    text-align: center;
+    flex: 1;
+    color: var(--text-muted);
+  }
+
+  .nav-item i {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav-item:hover i {
+    transform: none;
+  }
+
+  .nav-item.active {
+    box-shadow: none;
+    background-color: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .sidebar-footer {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    margin-top: 0;
+    z-index: 1001;
+    display: flex;
+    gap: 8px;
+  }
+
+  .theme-toggle {
+    padding: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--border-radius-sm);
+  }
+
+  .theme-toggle .theme-text {
+    display: none;
+  }
+
+  #simulator-toggle-btn {
+    display: none; /* 실제 모바일 기기에서는 시뮬레이터 버튼을 숨깁니다 */
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-bottom: 88px; /* 하단 네비게이션바에 콘텐츠가 가리지 않도록 */
+  }
+
+  .main-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    padding-right: 48px; /* 상단 테마 스위처를 위한 여백 */
+  }
+
+  .header-title h1 {
+    font-size: 22px;
+  }
+
+  .header-title p {
+    font-size: 13px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stat-icon i {
+    width: 18px;
+    height: 18px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .control-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .tab-group {
+    width: 100%;
+  }
+
+  .tab-btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .search-filter-group {
+    width: 100%;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .form-select {
+    width: 100%;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .card-header {
+    padding: 14px 16px;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .modal-card {
+    width: 95%;
+    max-width: 360px;
+  }
+
+  .modal-header, 
+  .modal-body, 
+  .modal-footer {
+    padding: 16px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .table th, 
+  .table td {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  
+  /* 비밀번호 모달 크기 최적화 */
+  #password-modal .modal-card {
+    max-width: 320px;
+  }
+}
+
+/* 390px 이하의 극소형 해상도 대응 */
+@media (max-width: 390px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .table th, 
+  .table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+}
+
+/* --------------------------------------------------
+   스마트폰 뷰 시뮬레이터 (Simulator Active) PC 전용 스타일
+-------------------------------------------------- */
+body.simulator-active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #0b0f19; /* 매우 어두운 전용 배경 */
+  padding: 40px 20px;
+  transition: background-color var(--transition-normal);
+  overflow: auto; /* 시뮬레이터 자체 스크롤 */
+}
+
+/* 시뮬레이터 모드일 때 메인 앱 컨테이너를 스마트폰 폼팩터(390px * 844px)로 고정 */
+body.simulator-active .app-container {
+  width: 390px;
+  height: 844px;
+  border: 12px solid #2e3b4e; /* 메탈릭 베질 */
+  border-radius: 44px;
+  background-color: var(--bg-app);
+  box-shadow: var(--box-shadow-lg), 
+              0 0 0 1px rgba(255, 255, 255, 0.05),
+              0 20px 50px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleUp {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 스마트폰 상단 노치 (Dynamic Island) 구현 */
+body.simulator-active .app-container::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 110px;
+  height: 24px;
+  background-color: #1e293b;
+  border-radius: 20px;
+  z-index: 1002;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* 시뮬레이터 모드에서의 모바일 UI 강제 오버라이드 */
+body.simulator-active .sidebar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  top: auto;
+  width: 100%;
+  height: 64px;
+  padding: 0 8px;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  border-right: none;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-sidebar);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+}
+
+body.simulator-active .sidebar-header {
+  display: none;
+}
+
+body.simulator-active .sidebar-menu {
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-around;
+  gap: 4px;
+}
+
+body.simulator-active .nav-item {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
+  font-size: 10px;
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+  flex: 1;
+  color: var(--text-muted);
+}
+
+body.simulator-active .nav-item i {
+  width: 20px;
+  height: 20px;
+}
+
+body.simulator-active .nav-item:hover i {
+  transform: none;
+}
+
+body.simulator-active .nav-item.active {
+  box-shadow: none;
+  background-color: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* 시뮬레이터 테마 전환 버튼 - 상단 노치 밑에 배치 */
+body.simulator-active .sidebar-footer {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  margin-top: 0;
+  z-index: 1001;
+}
+
+body.simulator-active .theme-toggle {
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius-sm);
+}
+
+body.simulator-active .theme-toggle .theme-text {
+  display: none;
+}
+
+body.simulator-active #simulator-toggle-btn {
+  display: none;
+}
+
+/* 시뮬레이터 콘텐츠 스크롤 및 여백 */
+body.simulator-active .main-content {
+  margin-left: 0;
+  padding: 16px;
+  padding-top: 96px; /* 상단 노치 + 헤더 탭 영역 확보 */
+  padding-bottom: 80px; /* 하단 탭바 영역 확보 */
+  height: 100%;
+  overflow-y: auto;
+}
+
+body.simulator-active .main-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+body.simulator-active .header-title h1 {
+  font-size: 22px;
+}
+
+body.simulator-active .header-title p {
+  font-size: 13px;
+}
+
+body.simulator-active .header-actions {
+  width: 100%;
+}
+
+body.simulator-active .header-actions .btn {
+  width: 100%;
+}
+
+body.simulator-active .stats-grid {
+  grid-template-columns: 1fr; /* 시뮬레이터 가로폭이 390px이므로 1열 배치 */
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+body.simulator-active .stat-card {
+  padding: 16px;
+  gap: 12px;
+}
+
+body.simulator-active .stat-icon {
+  width: 36px;
+  height: 36px;
+}
+
+body.simulator-active .stat-icon i {
+  width: 18px;
+  height: 18px;
+}
+
+body.simulator-active .stat-label {
+  font-size: 11px;
+}
+
+body.simulator-active .stat-value {
+  font-size: 18px;
+}
+
+body.simulator-active .control-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+body.simulator-active .tab-group {
+  width: 100%;
+}
+
+body.simulator-active .tab-btn {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+body.simulator-active .search-filter-group {
+  width: 100%;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.simulator-active .search-box {
+  width: 100%;
+}
+
+body.simulator-active .form-select {
+  width: 100%;
+}
+
+body.simulator-active .dashboard-layout {
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+body.simulator-active .card-header {
+  padding: 14px 16px;
+}
+
+body.simulator-active .card-body {
+  padding: 16px;
+}
+
+/* 모달 바인딩 최적화 */
+body.simulator-active .modal-backdrop {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 32px;
+}
+
+body.simulator-active .modal-card {
+  width: 90%;
+  max-width: 340px;
+}
+
+body.simulator-active .modal-header,
+body.simulator-active .modal-body,
+body.simulator-active .modal-footer {
+  padding: 16px;
+}
+
+body.simulator-active .form-row {
+  flex-direction: column;
+  gap: 0;
+}
+
+body.simulator-active .table th, 
+body.simulator-active .table td {
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+body.simulator-active #password-modal .modal-card {
+  max-width: 300px;
+}
+
+/* 시뮬레이터 해제 버튼 스타일 */
+.exit-simulator-btn {
+  display: none;
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background-color: var(--primary);
+  color: #ffffff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: var(--border-radius-md);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--box-shadow-md), 0 0 0 1px rgba(255,255,255,0.1);
+  transition: all var(--transition-fast);
+  align-items: center;
+  gap: 8px;
+  z-index: 1100;
+}
+
+.exit-simulator-btn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--box-shadow-lg);
+}
+
+.exit-simulator-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+body.simulator-active .exit-simulator-btn {
+  display: flex;
+}
+

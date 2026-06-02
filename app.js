@@ -170,6 +170,40 @@ elements.themeToggleBtn.addEventListener("click", () => {
   }
 });
 
+// 모바일 시뮬레이터 토글 및 종료 바인딩
+const simulatorToggleBtn = document.getElementById("simulator-toggle-btn");
+const exitSimulatorBtn = document.getElementById("exit-simulator-btn");
+
+if (simulatorToggleBtn) {
+  simulatorToggleBtn.addEventListener("click", () => {
+    document.body.classList.toggle("simulator-active");
+    const isActive = document.body.classList.contains("simulator-active");
+    const textSpan = simulatorToggleBtn.querySelector(".theme-text");
+    if (isActive) {
+      textSpan.textContent = "데스크탑 뷰로 복귀";
+      simulatorToggleBtn.style.borderColor = "var(--primary)";
+      simulatorToggleBtn.style.color = "var(--primary)";
+    } else {
+      textSpan.textContent = "스마트폰 뷰 (390px)";
+      simulatorToggleBtn.style.borderColor = "";
+      simulatorToggleBtn.style.color = "";
+    }
+    if (window.lucide) window.lucide.createIcons();
+  });
+}
+
+if (exitSimulatorBtn) {
+  exitSimulatorBtn.addEventListener("click", () => {
+    document.body.classList.remove("simulator-active");
+    if (simulatorToggleBtn) {
+      const textSpan = simulatorToggleBtn.querySelector(".theme-text");
+      textSpan.textContent = "스마트폰 뷰 (390px)";
+      simulatorToggleBtn.style.borderColor = "";
+      simulatorToggleBtn.style.color = "";
+    }
+  });
+}
+
 // --------------------------------------------------
 // 5. 보안 비밀번호 인증 모달 제어
 // --------------------------------------------------
