@@ -172,35 +172,62 @@ const elements = {
 // 4. 화면 전환 및 테마 설정
 // --------------------------------------------------
 
-// 사이드바 메뉴 전환
+// 해시 라우트에 따른 화면 표시 적용 함수
+function applyHashRoute() {
+  const hash = location.hash.replace("#", "") || "dashboard";
+  let targetSectionId = "dashboard-section";
+  
+  if (hash === "inventory") {
+    targetSectionId = "inventory-section";
+  } else if (hash === "order") {
+    targetSectionId = "order-section";
+  }
+  
+  // 1) 네비게이션 버튼 스타일 변경
+  elements.navItems.forEach(btn => {
+    if (btn.getAttribute("data-target") === targetSectionId) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  
+  // 2) 섹션 보기 전환
+  elements.sections.forEach(section => {
+    if (section.id === targetSectionId) {
+      section.classList.add("active");
+    } else {
+      section.classList.remove("active");
+    }
+  });
+  
+  // 3) 헤더 타이틀 및 서브타이틀 매핑
+  if (targetSectionId === "dashboard-section") {
+    elements.pageTitle.textContent = "대시보드";
+    elements.pageSubtitle.textContent = "실시간 사내 재고 현황을 한눈에 파악합니다.";
+  } else if (targetSectionId === "inventory-section") {
+    elements.pageTitle.textContent = "재고 목록";
+    elements.pageSubtitle.textContent = "2층/4층의 물품 재고를 조회 및 편집합니다.";
+  } else if (targetSectionId === "order-section") {
+    elements.pageTitle.textContent = "발주 및 입고 이력";
+    elements.pageSubtitle.textContent = "물품 발주 신청을 접수하고 입고 기록을 관리합니다.";
+  }
+}
+
+// 사이드바 메뉴 전환 (새로고침 적용)
 elements.navItems.forEach(navBtn => {
   navBtn.addEventListener("click", () => {
     const targetId = navBtn.getAttribute("data-target");
+    let hash = "dashboard";
     
-    // 네비게이션 버튼 스타일 변경
-    elements.navItems.forEach(btn => btn.classList.remove("active"));
-    navBtn.classList.add("active");
-    
-    // 섹션 보기 전환
-    elements.sections.forEach(section => {
-      if (section.id === targetId) {
-        section.classList.add("active");
-      } else {
-        section.classList.remove("active");
-      }
-    });
-
-    // 헤더 타이틀 및 서브타이틀 매핑
-    if (targetId === "dashboard-section") {
-      elements.pageTitle.textContent = "대시보드";
-      elements.pageSubtitle.textContent = "실시간 사내 재고 현황을 한눈에 파악합니다.";
-    } else if (targetId === "inventory-section") {
-      elements.pageTitle.textContent = "재고 목록";
-      elements.pageSubtitle.textContent = "2층/4층의 물품 재고를 조회 및 편집합니다.";
+    if (targetId === "inventory-section") {
+      hash = "inventory";
     } else if (targetId === "order-section") {
-      elements.pageTitle.textContent = "발주 및 입고 이력";
-      elements.pageSubtitle.textContent = "물품 발주 신청을 접수하고 입고 기록을 관리합니다.";
+      hash = "order";
     }
+    
+    location.hash = hash;
+    location.reload();
   });
 });
 
@@ -886,6 +913,9 @@ elements.restockForm.addEventListener("submit", async (e) => {
 // 11. 초기 앱 구동 시 초기화
 // --------------------------------------------------
 async function initApp() {
+  // 현재 URL 해시에 해당하는 화면 표시 적용
+  applyHashRoute();
+
   if (supabaseClient) {
     await syncWithSupabase();
   }
