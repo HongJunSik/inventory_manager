@@ -1608,3 +1608,65 @@ body.simulator-active .exit-simulator-btn {
   display: flex;
 }
 
+/* --------------------------------------------------
+   비고(Notes) 마우스 포인터 기준 팝오버 스타일
+-------------------------------------------------- */
+.notes-popover {
+  position: absolute;
+  z-index: 1000;
+  max-width: 280px;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  box-shadow: var(--box-shadow-md);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-main);
+  backdrop-filter: var(--glass-blur);
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: auto;
+}
+
+.notes-popover.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.notes-popover .popover-content {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* 화살표 가이드 */
+.notes-popover .popover-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--bg-sidebar);
+  transform: rotate(45deg);
+  box-sizing: border-box;
+}
+
+.notes-popover.popover-top .popover-arrow {
+  bottom: -4px;
+  left: calc(50% - 4px);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notes-popover.popover-bottom .popover-arrow {
+  top: -4px;
+  left: calc(50% - 4px);
+  border-left: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+}
+
+/* 클릭 가능한 비고 셀에 호버 피드백 */
+.table td.notes-cell:hover {
+  color: var(--primary) !important;
+  text-decoration: underline;
+}
+

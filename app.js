@@ -524,7 +524,7 @@ function renderInventoryTable() {
         <td class="text-right font-semibold" style="font-size: 15px">${item.quantity} 개</td>
         <td class="text-right text-muted">${item.safetyStock} 개</td>
         <td>${statusBadge}</td>
-        <td class="text-muted" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <td class="notes-cell text-muted" data-id="${item.id}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" title="클릭하여 비고 전체 보기">
           ${item.notes || "-"}
         </td>
         <td>
@@ -1025,3 +1025,76 @@ document.addEventListener("DOMContentLoaded", initApp);
 if (document.readyState === "interactive" || document.readyState === "complete") {
   initApp();
 }
+
+// --------------------------------------------------
+// 12. 비고(Notes) 팝오버 표시 기능 (마우스 포인터 위치 기준)
+// --------------------------------------------------
+let notesPopover = null;
+
+function showNotesPopover(e, notesText) {
+  closeNotesPopover();
+
+  notesPopover = document.createElement("div");
+  notesPopover.className = "notes-popover";
+  notesPopover.innerHTML = `
+    <div class="popover-content">${notesText.replace(/\n/g, "<br>")}</div>
+    <div class="popover-arrow"></div>
+  `;
+  document.body.appendChild(notesPopover);
+
+  notesPopover.addEventListener("click", (evt) => {
+    evt.stopPropagation();
+  });
+
+  const x = e.pageX;
+  const y = e.pageY;
+  
+  const popoverWidth = notesPopover.offsetWidth;
+  const popoverHeight = notesPopover.offsetHeight;
+
+  // 마우스 클릭 위치 기준 중앙 정렬 및 화면 경계 보정
+  let leftPosition = x - popoverWidth / 2;
+  if (leftPosition < 10) {
+    leftPosition = 10;
+  } else if (leftPosition + popoverWidth > window.innerWidth - 10) {
+    leftPosition = window.innerWidth - popoverWidth - 10;
+  }
+  notesPopover.style.left = `${leftPosition}px`;
+  
+  // 마우스 클릭 위치보다 위에 표시하되, 화면 위에 걸치면 밑에 표시
+  let topPosition = y - popoverHeight - 12;
+  if (topPosition < window.scrollY + 10) {
+    topPosition = y + 16;
+    notesPopover.classList.add("popover-bottom");
+  } else {
+    notesPopover.classList.add("popover-top");
+  }
+  notesPopover.style.top = `${topPosition}px`;
+
+  requestAnimationFrame(() => {
+    notesPopover.classList.add("active");
+  });
+}
+
+function closeNotesPopover() {
+  if (notesPopover) {
+    notesPopover.remove();
+    notesPopover = null;
+  }
+}
+
+// 비고(notes-cell) 클릭 이벤트 리스너 (이벤트 위임)
+document.addEventListener("click", (e) => {
+  const notesCell = e.target.closest(".notes-cell");
+  if (notesCell) {
+    e.stopPropagation();
+    const itemId = notesCell.getAttribute("data-id");
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      const text = item.notes ? item.notes.trim() : "";
+      showNotesPopover(e, text || "비고 내용이 없습니다.");
+    }
+  } else {
+    closeNotesPopover();
+  }
+});
