@@ -182,10 +182,12 @@
             <select id="category-filter" class="form-select">
               <option value="all">전체 카테고리</option>
               <option value="사무용품">사무용품</option>
-              <option value="식음료/탕비실">식음료/탕비실</option>
-              <option value="생활용품">생활용품</option>
-              <option value="IT기기/장비">IT기기/장비</option>
-              <option value="기타">기타</option>
+                <option value="식음료/탕비실">식음료/탕비실</option>
+                <option value="생활용품">생활용품</option>
+                <option value="IT기기/장비">IT기기/장비</option>
+                <option value="의료">의료</option>
+                <option value="화장품">화장품</option>
+                <option value="기타">기타</option>
             </select>
           </div>
         </div>
@@ -196,8 +198,14 @@
             <table class="table" id="inventory-table">
               <thead>
                 <tr>
-                  <th>카테고리</th>
-                  <th>품목명</th>
+                  <th id="th-category" class="sortable-header">
+                    <span>카테고리</span>
+                    <span class="sort-icon-container"><i data-lucide="arrow-up-down" class="sort-icon"></i></span>
+                  </th>
+                  <th id="th-name" class="sortable-header">
+                    <span>품목명</span>
+                    <span class="sort-icon-container"><i data-lucide="arrow-up-down" class="sort-icon"></i></span>
+                  </th>
                   <th>위치</th>
                   <th class="text-right">현재 수량</th>
                   <th class="text-right">안전 재고</th>
@@ -328,6 +336,8 @@
                 <option value="식음료/탕비실">식음료/탕비실</option>
                 <option value="생활용품">생활용품</option>
                 <option value="IT기기/장비">IT기기/장비</option>
+                <option value="의료">의료</option>
+                <option value="화장품">화장품</option>
                 <option value="기타">기타</option>
               </select>
             </div>

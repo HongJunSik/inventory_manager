@@ -80,6 +80,10 @@ let currentInventoryFloor = "all";
 let currentInventoryCategory = "all";
 let currentOrderFilter = "all";
 
+// 현재 정렬 상태
+let currentSortKey = "default"; // "category" | "name" | "default"
+let currentSortDir = "asc";     // "asc" | "desc"
+
 // --------------------------------------------------
 // 2. LocalStorage 데이터 동기화 (로컬 백업용)
 // --------------------------------------------------
@@ -122,6 +126,8 @@ const elements = {
   inventoryTbody: document.getElementById("inventory-tbody"),
   tableEmptyState: document.getElementById("table-empty-state"),
   quickAddBtn: document.getElementById("quick-add-btn"),
+  thCategory: document.getElementById("th-category"),
+  thName: document.getElementById("th-name"),
   
   // 발주 폼 및 내역
   orderForm: document.getElementById("order-form"),
@@ -408,6 +414,45 @@ function renderDashboard() {
 // --------------------------------------------------
 // 7. 재고 목록 렌더링 및 CRUD 로직
 // --------------------------------------------------
+
+// 정렬 상태에 따른 테이블 헤더 아이콘 및 스타일 업데이트 함수
+function updateSortHeadersUI() {
+  if (!elements.thCategory || !elements.thName) return;
+
+  // 기존 정렬 활성화 클래스 제거
+  elements.thCategory.classList.remove("active-sort");
+  elements.thName.classList.remove("active-sort");
+
+  const catContainer = elements.thCategory.querySelector(".sort-icon-container");
+  const nameContainer = elements.thName.querySelector(".sort-icon-container");
+
+  if (currentSortKey === "category") {
+    elements.thCategory.classList.add("active-sort");
+    if (catContainer) {
+      catContainer.innerHTML = `<i data-lucide="${currentSortDir === "asc" ? "arrow-up" : "arrow-down"}" class="sort-icon"></i>`;
+    }
+    if (nameContainer) {
+      nameContainer.innerHTML = `<i data-lucide="arrow-up-down" class="sort-icon"></i>`;
+    }
+  } else if (currentSortKey === "name") {
+    elements.thName.classList.add("active-sort");
+    if (nameContainer) {
+      nameContainer.innerHTML = `<i data-lucide="${currentSortDir === "asc" ? "arrow-up" : "arrow-down"}" class="sort-icon"></i>`;
+    }
+    if (catContainer) {
+      catContainer.innerHTML = `<i data-lucide="arrow-up-down" class="sort-icon"></i>`;
+    }
+  } else {
+    // 기본 정렬 상태
+    if (catContainer) {
+      catContainer.innerHTML = `<i data-lucide="arrow-up-down" class="sort-icon"></i>`;
+    }
+    if (nameContainer) {
+      nameContainer.innerHTML = `<i data-lucide="arrow-up-down" class="sort-icon"></i>`;
+    }
+  }
+}
+
 function renderInventoryTable() {
   elements.inventoryTbody.innerHTML = "";
 
@@ -424,6 +469,30 @@ function renderInventoryTable() {
 
     return matchFloor && matchCategory && matchQuery;
   });
+
+  // 정렬 적용
+  filteredItems.sort((a, b) => {
+    if (currentSortKey === "category") {
+      const comp = a.category.localeCompare(b.category, "ko");
+      if (comp !== 0) {
+        return currentSortDir === "asc" ? comp : -comp;
+      }
+      return a.name.localeCompare(b.name, "ko");
+    } else if (currentSortKey === "name") {
+      const comp = a.name.localeCompare(b.name, "ko");
+      return currentSortDir === "asc" ? comp : -comp;
+    } else {
+      // 기본 정렬: 카테고리 오름차순 -> 품목명 오름차순
+      const catComp = a.category.localeCompare(b.category, "ko");
+      if (catComp !== 0) {
+        return catComp;
+      }
+      return a.name.localeCompare(b.name, "ko");
+    }
+  });
+
+  // 정렬 헤더 UI 업데이트
+  updateSortHeadersUI();
 
   if (filteredItems.length === 0) {
     elements.tableEmptyState.classList.remove("d-none");
@@ -494,6 +563,31 @@ elements.categoryFilter.addEventListener("change", () => {
   renderInventoryTable();
 });
 elements.inventorySearch.addEventListener("input", renderInventoryTable);
+
+// 테이블 헤더 정렬 클릭 이벤트 바인딩
+if (elements.thCategory) {
+  elements.thCategory.addEventListener("click", () => {
+    if (currentSortKey === "category") {
+      currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+    } else {
+      currentSortKey = "category";
+      currentSortDir = "asc";
+    }
+    renderInventoryTable();
+  });
+}
+
+if (elements.thName) {
+  elements.thName.addEventListener("click", () => {
+    if (currentSortKey === "name") {
+      currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+    } else {
+      currentSortKey = "name";
+      currentSortDir = "asc";
+    }
+    renderInventoryTable();
+  });
+}
 
 // 물품 삭제 함수 (비밀번호 인증 필요)
 window.deleteItem = function(id) {
