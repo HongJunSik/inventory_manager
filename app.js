@@ -736,14 +736,14 @@ elements.orderForm.addEventListener("submit", async (e) => {
 });
 
 // 발주 상태 '입고완료' 처리 및 연동 재고 증가 (비밀번호 인증 필요)
-window.completeOrder = function(orderId) {
+window.completeOrder = async function(orderId) {
   const order = orders.find(o => o.id === orderId);
   if (!order) return;
 
   const targetItem = items.find(i => i.id === order.itemId);
 
   if (targetItem) {
-    runWithPasswordProtection(async () => {
+    // runWithPasswordProtection(async () => {
       if (confirm(`발주 신청 수량(${order.quantity}개)을 [${targetItem.name}] 재고에 추가(입고) 처리하시겠습니까?`)) {
         const nextQty = targetItem.quantity + order.quantity;
         if (supabaseClient) {
@@ -770,10 +770,10 @@ window.completeOrder = function(orderId) {
         
         alert(`[${targetItem.name}] 물품이 ${order.quantity}개 정상 입고되어 재고가 업데이트되었습니다.`);
       }
-    });
+    // });
   } else {
     // 원본 재고 물품이 삭제된 경우
-    runWithPasswordProtection(async () => {
+    // runWithPasswordProtection(async () => {
       if (confirm("원본 재고 물품이 삭제되었습니다. 발주 이력 상태만 입고완료로 처리하겠습니까?")) {
         if (supabaseClient) {
           const { error } = await supabaseClient.from("orders").update({ status: "입고완료" }).eq("id", orderId);
@@ -787,7 +787,7 @@ window.completeOrder = function(orderId) {
         renderDashboard();
         renderOrderHistory();
       }
-    });
+    // });
   }
 };
 
