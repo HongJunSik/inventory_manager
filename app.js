@@ -385,7 +385,7 @@ function renderDashboard() {
 
     const recentOrders = [...orders]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5);
+      .slice(0, 30);
 
     recentOrders.forEach(order => {
       const statusBadge = order.status === "입고완료" 
